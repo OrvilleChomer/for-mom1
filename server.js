@@ -561,10 +561,13 @@ function DbTaskProcessor() {
   
   /*
   */
-  taskPrc.addTask = function(taskFunction) {
+  taskPrc.addTask = function(taskFunction, doneTaskFunction, taskFailedFunction) {
     console.log("taskPrc.addTask() method called");
     const dbTask = {};
     dbTask.taskFunction = taskFunction;
+    dbTask.doneTaskFunction = doneTaskFunction;
+    dbTask.taskFailedFunction = taskFailedFunction;
+    
     dbTask.taskAdded = new Date();
     
     dbTask.continueOnError = false; // if true, it will not stop processing tasks if an error occurs   
@@ -612,11 +615,24 @@ function DbTaskProcessor() {
       console.log("popping a dbTask off the queue");
       const dbTask = taskQueueByIndex.pop();
       const taskFunction = dbTask.taskFunction;
+      const doneTaskFunction = dbTask.doneTaskFunction;
+      const taskFailedFunction = dbTask.taskFailedFunction;
       
       dbTask.taskStarted = new Date();
       lastDbTask = dbTask;
       bATaskStarted = true;
-      taskFunction(dataInput,returnPayload,doneTask);
+      
+      let evt = {};
+      evt.dbTask = dbTask;
+      eventTriggered("beginTask", evt);
+      
+      // taskFunction() PARAMS:
+      //  dataInput           - data from API client request (most likely)
+      //  doneTaskFunction    - this is the function that is called when the task is done successfully
+      //  taskFailedFunction  - this is the function that is called if the task fails
+      taskFunction(dataInput,doneTaskFunction,taskFailedFunction);
+      
+      
     } else {
       // ##############################################
       //  NO MORE TASKS, SO SEND BACK THE RESULTS!
