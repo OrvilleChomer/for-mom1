@@ -8,7 +8,7 @@
   
   
   
-  -------------
+  ------
   Documentation on using neDb:
      - https://github.com/louischatriot/nedb
      
@@ -109,7 +109,7 @@ app.post('/api', (request, response) => {
   } // end if (!dataInput.pin || !dataInput.userEmailAdr)
   
   
-  dbTaskProc.beginApiRequestTasksForCmd(cmd);
+  dbTaskProc.beginApiRequestTasksForCmd(cmd, response);
   
   switch(cmd) {
     case "getHash":
@@ -321,15 +321,29 @@ function appTableSchemaSetup(sTableName, fields) {
 /*************************************************************************
 
  *************************************************************************/
-function deviceRegistered(dataInput, returnPayload) {
+function deviceRegistered(dataInput) {
   console.log("deviceRegistered() called");
+  
+  
+  dbTaskProc.addTask(deviceRegistered2);
+  dbTaskProc.performTasks(dataInput);
+  
+  return;
+} // end of function deviceRegistered()
+
+
+
+/*************************************************************************
+
+ *************************************************************************/
+function deviceRegistered2(dataInput, returnPayload) {
+  console.log("deviceRegistered2() called");
   
   returnPayload.payloadStatus = "success";
   
   
   return;
-} // end of function deviceRegistered()
-
+} // end of function deviceRegistered2()
 
 
 
@@ -497,16 +511,53 @@ function resetApp(dataInput, returnPayload) {
    uses 'new' keyword like:
    const dbTaskProc = new DbTaskProcessor() 
  *************************************************************************/
-function DbTaskProcessor(iDataInput) {
+function DbTaskProcessor() {
   console.log("called DbTaskProcessor() factory function");
   const taskPrc = this;
   let taskQueueByIndex = [];
   let tasksCompletedByIndex = [];
   let dataInput,returnPayload,lastDbTask;
+  let bErrorsOccurred = false;
   let bATaskStarted = false;
   let response,cmd;
   
+  let eventNameList = ['apirequestbegun','taskadded','performtasks','begintask','taskcompleted','taskfailed','taskscompleted','processingstopped','responsesent','clearqueue'];
+  let eventHandlersByEventName = [];
+  
   lastDbTask = undefined;
+  
+  
+    
+  /*
+  */
+  taskPrc.addEventListener = function(siEventName, fn) {
+    let sEventName = siEventName.toLowerCase();
+    
+    if (eventNameList[sEventName]) {
+      // valid event name
+      eventHandlersByEventName[sEventName] = fn;
+    } // end if
+    
+  } // end of addEventListener method
+  
+  
+  
+  /*
+  */
+  function eventTriggered(siEventName, event) {
+    let sEventName = siEventName.toLowerCase();
+    
+    const fn = eventHandlersByEventName[sEventName];
+    
+    if (typeof fn === "function") {
+      event.eventName = sEventName;
+      event.eventTime = new Date();
+      fn(event); // run the event handler passing in event object
+    } // end if
+  } // end of function eventTriggered
+  
+  
+  
   
   /*
   */
@@ -516,19 +567,30 @@ function DbTaskProcessor(iDataInput) {
     dbTask.taskFunction = taskFunction;
     dbTask.taskAdded = new Date();
     
+    dbTask.continueOnError = false; // if true, it will not stop processing tasks if an error occurs   
     taskQueueByIndex.push(dbTask);
+    
+    let evt = {};
+    evt.dbTask = dbTask;
+    eventTriggered("taskadded", evt);    
+    return dbTask;
   } // end of addTask() method
   
   
   
   /*
   */
-  taskPrc.performTasks = function(inpDataInput, responseObj) {
+  taskPrc.performTasks = function(inpDataInput) {
     console.log("taskPrc.performTasks() method called");
     dataInput = inpDataInput;
     returnPayload = [];
-    response = responseObj;
-    performTask();
+    
+    let eventInfo = {};
+    eventInfo.queue = taskQueueByIndex;
+    eventTriggered("performTasks", eventInfo);    
+    
+    performTask();    
+    
   } // end of performTasks method
   
   
@@ -603,10 +665,12 @@ function DbTaskProcessor(iDataInput) {
   
   /*
   */
-  taskPrc.beginApiRequestTasksForCmd = function(sCmd) {
+  taskPrc.beginApiRequestTasksForCmd = function(sCmd, responseObj) {
     console.log("taskPrc.beginApiRequestForCmd() method called");
     
+    
     cmd = sCmd; // keep track of API request command (cmd)
+    response = responseObj;
     taskPrc.clearQueue(); // start fresh
   } // end of beginApiRequestTasksForCmd method
   
