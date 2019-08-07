@@ -8,7 +8,7 @@
   
   
   
-  ------
+  -------------
   Documentation on using neDb:
      - https://github.com/louischatriot/nedb
      
