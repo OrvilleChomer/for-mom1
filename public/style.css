@@ -1,0 +1,110 @@
+/* styles */
+/* called by your view template */
+
+* {
+  box-sizing: border-box;
+}
+
+
+
+body {
+  font-family: "Benton Sans", "Helvetica Neue", helvetica, arial, sans-serif;
+  margin: 0;
+  padding:0;
+  background-color:#00b8e6;
+}
+
+.bold {
+  font-weight: bold;
+}
+
+h1 {
+  font-style: italic;
+  color: #373fff;
+}
+
+
+
+
+#configProblemPanel {
+  position:absolute;
+  background:lightblue;
+  width:600px;
+  height:400px;
+  display:none;
+}
+
+#refreshPage {
+  display:none; 
+  height:90px;
+}
+
+
+#registerDevicePanel {
+  position:absolute;
+  left:0px;
+  top:0px;
+  background:lightblue;
+  width:600px;
+  height:400px;
+  display:none;
+}
+
+#installToHomeScreenInitPrompt {
+  display:none;
+}
+
+input {
+  display: block;
+  margin-bottom: 10px;
+  padding: 5px;
+  border: 1px solid lightgrey;
+  border-radius: 3px;
+  font-size: 16px;
+}
+
+#menu {
+  display: none;
+}
+
+.mnuBtn {
+  font-size:20pt;
+  height:50px;
+  margin-bottom:12px;
+}
+
+
+#menuList {
+  list-style-type:none;
+  padding:15px;
+}
+
+button {
+  font-size: 16px;
+  border-radius: 3px;
+  background-color: lightgrey;
+  border: 1px solid grey;
+  box-shadow: 2px 2px teal;
+  cursor: pointer;
+  height:40px;
+}
+
+button:hover {
+  background-color: yellow;
+}
+
+button:active {
+  box-shadow: none;
+}
+
+li {
+  margin-bottom: 5px;
+}
+
+#splash {
+  background:green;
+  
+}
+
+
+
