@@ -1,0 +1,100 @@
+<!-- This is a static file -->
+<!-- served from your routes in server.js   :)  -->
+
+
+<!--
+   The Coding Train... video with thoughts on setting up a web app on Glitch
+   https://www.youtube.com/watch?v=Rz886HkV1j4
+
+   importing into Glitch from Github:   (2:38)
+  -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>For Mom</title>
+    <meta name="description" content="A cool thing made with Glitch">
+    
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name = "viewport" content = "user-scalable=no, width=device-width">
+    <meta name="apple-mobile-web-app-title" content="For Mom">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">	
+    
+    <meta http-equiv="PRAGMA" content="NO-CACHE" />
+    
+    <link rel="apple-touch-icon" href="https://cdn.glitch.com/a2964a8f-6339-465f-8a8d-329fd8d12c43%2Ftouch-icon-iphone-retina.png?v=1565021690526">
+  
+    <!-- import the webpage's stylesheet -->
+    <link rel="stylesheet" href="/style.css">
+    
+    <!-- import the webpage's client-side javascript file -->
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"   
+            integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="   
+            crossorigin="anonymous"></script>
+    
+    <script src="/maint.js" defer></script>
+    <script src="/ui.js" defer></script>
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    
+    <div id="splash">
+      <h2>For Mom</h2>
+      &copy; <span id="copyrightYear1"></span> Original Copyright: Orville Paul Chomer
+      
+      MIT License
+    </div><!-- splash -->
+    
+    <div id="menu">
+      <span>Hello <span id="userNameLabel">So-and-so</span></span>
+      <ul id="menuList">
+        
+        
+      </ul>
+      <div id="appInfo"></div>
+    </div><!-- menu -->
+    
+    <div id="tint"></div>
+    <div id="configProblemPanel">
+      The the application's <i>.env</i> file has not been set up correctly.
+    </div>
+    
+    
+    <div id="registerDevicePanel">
+      This application has not been registered on this device yet.
+      
+      <p>Please enter in the follow information which was emailed/texted to you:</p>
+      
+      Email Address:
+      <input id="regEmailAdr" type="email" autocomplete="off">
+      
+      Application PIN:
+      <input id="appPIN" type="password" autocomplete="off">
+      
+      <button onclick="registerThisDevice()">
+        Register this Device
+      </button>
+      
+      <div id="regResults"></div>        
+      
+    </div>
+
+    <div id="info1">
+      
+    </div><!-- info1 -->
+    
+    <button onclick="resetAppRequest()">
+      Reset App...
+    </button>
+    
+    <div id="installToHomeScreenInitPrompt">
+      <button>
+        Install this App to Home Screen
+      </button>
+    </div>
+    
+    <button id="refreshPage" onclick="refreshPage()">Refresh Page</button>
+  </body>
+</html>
+
