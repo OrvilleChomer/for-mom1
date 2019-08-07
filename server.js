@@ -336,10 +336,10 @@ function deviceRegistered(dataInput) {
 /*************************************************************************
 
  *************************************************************************/
-function deviceRegistered2(dataInput, returnPayload) {
+function deviceRegistered2(dataInput,doneTaskFunction,taskFailedFunction) {
   console.log("deviceRegistered2() called");
   
-  returnPayload.payloadStatus = "success";
+ // returnPayload.payloadStatus = "success";
   
   
   return;
@@ -528,8 +528,8 @@ function DbTaskProcessor() {
   
   
     
-  /*
-  */
+  /*************************************************************************
+  *************************************************************************/
   taskPrc.addEventListener = function(siEventName, fn) {
     let sEventName = siEventName.toLowerCase();
     
@@ -542,8 +542,8 @@ function DbTaskProcessor() {
   
   
   
-  /*
-  */
+  /*************************************************************************
+  *************************************************************************/
   function eventTriggered(siEventName, event) {
     let sEventName = siEventName.toLowerCase();
     
@@ -559,8 +559,8 @@ function DbTaskProcessor() {
   
   
   
-  /*
-  */
+  /*************************************************************************
+  *************************************************************************/
   taskPrc.addTask = function(taskFunction, doneTaskFunction, taskFailedFunction) {
     console.log("taskPrc.addTask() method called");
     const dbTask = {};
@@ -581,8 +581,8 @@ function DbTaskProcessor() {
   
   
   
-  /*
-  */
+  /*************************************************************************
+  *************************************************************************/
   taskPrc.performTasks = function(inpDataInput) {
     console.log("taskPrc.performTasks() method called");
     dataInput = inpDataInput;
@@ -598,8 +598,8 @@ function DbTaskProcessor() {
   
   
   
-  /*
-  */
+  /*************************************************************************
+  *************************************************************************/
   function performTask() {
     console.log("performTask() method called");
     
@@ -615,8 +615,7 @@ function DbTaskProcessor() {
       console.log("popping a dbTask off the queue");
       const dbTask = taskQueueByIndex.pop();
       const taskFunction = dbTask.taskFunction;
-      const doneTaskFunction = dbTask.doneTaskFunction;
-      const taskFailedFunction = dbTask.taskFailedFunction;
+      
       
       dbTask.taskStarted = new Date();
       lastDbTask = dbTask;
@@ -628,10 +627,11 @@ function DbTaskProcessor() {
       
       // taskFunction() PARAMS:
       //  dataInput           - data from API client request (most likely)
-      //  doneTaskFunction    - this is the function that is called when the task is done successfully
-      //  taskFailedFunction  - this is the function that is called if the task fails
-      taskFunction(dataInput,doneTaskFunction,taskFailedFunction);
-      
+      //  doneTask            - this is the function that is called when the task is done successfully
+      //                        (declared below)
+      //  taskFailed          - this is the function that is called if the task fails
+      //                        (declared below)
+      taskFunction(dataInput,doneTask,taskFailed);      
       
     } else {
       // ##############################################
@@ -664,11 +664,16 @@ function DbTaskProcessor() {
   
   
   
-  /*
-  */
+  /*************************************************************************
+  *************************************************************************/
   function doneTask(inpTaskResults) {
     console.log("doneTask() method called");
     
+    inpTaskResults.resultTimestamp = new Date();    
+
+    let evt = {};
+    evt.dbTask = lastDbTask;
+    eventTriggered("taskCompleted", evt);
     
     // add to our return payload:
     returnPayload.push(inpTaskResults);
@@ -678,28 +683,63 @@ function DbTaskProcessor() {
   
   
   
+  /*************************************************************************
+  *************************************************************************/
+  function taskFailed(inpTaskResults) {
+    console.log("taskFailed() method called");
+    
+
+    bErrorsOccurred = true;    
+    // add to our return payload: any info about the failure
+    returnPayload.push(inpTaskResults);
+    
+
+    let evt = {};
+    evt.dbTask = lastDbTask;
+    eventTriggered("taskFailed", evt);
+    
+    if (!lastDbTask.continueOnError) {
+      let evt = {};
+      evt.taskWithError = lastDbTask;
+      eventTriggered("processingStopped", evt);       
+      taskPrc.clearQueue({fromBeginApiRequest:true}); // don't process any tasks that might remain
+    } // end if
+    
+    performTask(); // should result in what was accumulated to be sent back to the client
+  } // end of function taskFailed()
   
-  /*
-  */
+  
+  
+  /*************************************************************************
+  *************************************************************************/
   taskPrc.beginApiRequestTasksForCmd = function(sCmd, responseObj) {
     console.log("taskPrc.beginApiRequestForCmd() method called");
     
+    let evt = {};
+    evt.apiCmd = sCmd;
+    eventTriggered("apiRequestBegun", evt);
     
     cmd = sCmd; // keep track of API request command (cmd)
     response = responseObj;
-    taskPrc.clearQueue(); // start fresh
+    taskPrc.clearQueue({fromBeginApiRequest:true}); // start fresh
   } // end of beginApiRequestTasksForCmd method
   
   
   
-  /**
-  */
-  taskPrc.clearQueue = function() {
+  /*************************************************************************
+  *************************************************************************/
+  taskPrc.clearQueue = function(optParam) {
     console.log("taskPrc.clearQueue() method called");
     taskQueueByIndex = [];
     tasksCompletedByIndex = [];
     bATaskStarted = false;
     lastDbTask = undefined;
+    
+    if (typeof optParam === "undefined") {
+      let evt = {};      
+      eventTriggered("clearQueue", evt);
+    } // end if
+    
   } // end of clearQueue method
   
   
