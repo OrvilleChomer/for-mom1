@@ -24,6 +24,7 @@
  *************************************************************************/
 // init project
 const express = require('express');
+const process = require('process');
 const Datastore = require('nedb');
 const app = express();
 const fs = require('fs');
@@ -39,12 +40,21 @@ console.log('logging on the server side');
 
 app.use(express.json({limit:'1mb'}));
 
+setupSchemaDefinition();
+
 // placing database in .data directory so it is private
 const sDbFileName = "./.data/"+process.env.dbFileName;
 
 if (sDbFileName) {
   let bExists1 = fs.existsSync(sDbFileName);
-}
+  
+  if (bExists1) {
+    console.log("database file exists");
+  } else {
+    console.log("database file does not exist");
+  } // end if/else
+  
+} // end if
 
 let bExists2;
 
@@ -54,10 +64,66 @@ const defAdminUserName = process.env.defAdminUserName;
 const defMomEmailAdr = process.env.defMomEmailAdr;
 
 let dbTaskProc;
+let bDbOpen = false;
+
+
+
+/*************************************************************************
+   Do cleanup when node server is shut down...
+   
+      https://stackoverflow.com/questions/14031763/doing-a-cleanup-action-just-before-node-js-exits
+      
+ *************************************************************************/
+function exitHandler(options, exitCode) {
+    console.log("exitHandler() called");
+    if (options.cleanup) console.log('clean');
+    if (exitCode || exitCode === 0) console.log(exitCode);
+  
+    if (bDbOpen) {
+      // https://github.com/louischatriot/nedb#persistence
+      console.log("about to call: db.persistence.compactDatafile()");
+      db.persistence.compactDatafile();
+    } // end if
+  
+    if (options.exit) process.exit();
+} // end of function exitHandler()
+
+
 
 if (sDbFileName) {
   db = new Datastore(sDbFileName); // (5:13)
   db.loadDatabase(); // (5:40)
+  bDbOpen = true;
+  
+  
+  /*
+  
+  // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+  // CAPTURE NODE.JS SERVER SHUTTING DOWN:
+  
+  //  https://stackoverflow.com/questions/14031763/doing-a-cleanup-action-just-before-node-js-exits
+  //  https://nodejs.org/api/process.html#process_event_exit
+  // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+  
+  process.stdin.resume();//so the program will not close instantly
+  
+  //do something when app is closing
+  process.on('exit', exitHandler.bind(null,{exit:true}));
+  
+  //catches ctrl+c event
+  process.on('SIGINT', exitHandler.bind(null, {exit:true}));
+
+  // catches "kill pid" (for example: nodemon restart)
+  process.on('SIGUSR1', exitHandler.bind(null, {exit:true}));
+  process.on('SIGUSR2', exitHandler.bind(null, {exit:true}));
+
+  //catches uncaught exceptions
+  process.on('uncaughtException', exitHandler.bind(null, {exit:true}));
+  
+  // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+  // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+  
+  */
   
   dbTaskProc = new DbTaskProcessor();
   
@@ -122,6 +188,15 @@ app.post('/api', (request, response) => {
       break;
     case "registerDevice":
       deviceRegistered(dataInput, returnPayload);
+      break;
+    case "getUsers":
+      getUsers(dataInput);
+      break;
+    case "getRecs":
+      getRecs(dataInput);
+      break;
+    case "saveRec":
+      saveRec(dataInput);
       break;
     case "newUserSetup":
       break;
@@ -238,60 +313,67 @@ const listener = app.listen(process.env.PORT, function() {
 
 
 function setupSchemaDefinition() {
+  console.log("setupSchemaDefinition() function called");
   appTableSchemaSetup("users",[
-  {field:"emailAdr",type:"email",caption:"Email Address"},
-  {field:"userName",type:"text",size:50,caption:"User Name"},
-  {field:"functionTags",type:"text",size:80,caption:"Function Tag Values"},
+  {field:"emailAdr",type:"email",caption:"Email Address",minLength:5},
+  {field:"userName",type:"text",size:50,caption:"User Name",listIndex:0,colWidth:300,minLength:2},
+  {field:"functionTags",type:"text",size:80,caption:"Function Tag Values",inputWidth:300},
   {field:"locStatusId",type:"fk",fkTable:"locStatuses"}
-  ]);
+  ],"Users", "User","user");
   
   appTableSchemaSetup("appointments",[
-  {field:"appointmentTitle",type:"text",size:60,caption:"Appointment"},
-  {field:"descr",type:"memo",caption:"Details"}
-  ]);
+  {field:"appointmentTitle",type:"text",size:60,caption:"Appointment",colWidth:300,listIndex:0,minLength:4},
+  {field:"descr",type:"memo",caption:"Details"},
+  {field:"readyToGo",type:"number",caption:"Ready To Go",defValue:1.25},
+  {field:"remindOrville",type:"number",caption:"Remind Orville",defValue:2},
+  {field:"comments",type:"text",size:80,caption:"Comments"},
+  {field:"important",type:"text",size:80,caption:"Important"},
+  {field:"seatCushion",type:"boolean",caption:"Bring Seat Cushion"}
+  ],"Appointments","Appointment","appointment");
   
   appTableSchemaSetup("appointmentDates",[
   {field:"appointmentId",type:"fk",fkTable:"appointments"},
   {field:"appointmentDate",type:"date",caption:"Appointment At"},
   {field:"results",type:"memo"},
   {field:"comments",type:"entries",caption:"Comments"}
-  ]);
+  ],"Appointment Dates","Appointment Date","appointmentDate");
   
   appTableSchemaSetup("locStatuses",[
-  {field:"locStatusText",type:"text",caption:"Location Status Text"},
+  {field:"locStatusText",type:"text",caption:"Location Status Text",listIndex:0,minLength:6},
   {field:"isGlobal",type:"boolean",caption:"Global"},
   {field:"forUserId",type:"fk",fkTable:"users"}
-  ]);
+  ],"Location Statuses","Location Status");
   
   appTableSchemaSetup("weeklyReminders",[
-  {field:"reminderText",type:"text",caption:"Weekly Reminder"},
-  {field:"dayOfWeek",type:"weekday",caption:"Day of Week"}
-  ]);
+  {field:"reminderText",type:"text",caption:"Weekly Reminder",listIndex:0,colWidth:400,inputWidth:300,minLength:2},
+  {field:"dayOfWeek",type:"weekday",caption:"Day of Week",listIndex:1}
+  ],"Weekly Reminders","Weekly Reminder","weeklyReminder");
   
   appTableSchemaSetup("shoppingLists",[
-  {field:"lstTitle",type:"text",caption:"List Title"}
-  ]);
+  {field:"lstTitle",type:"text",caption:"List Title",listIndex:0,minLength:6}
+  ],"Shopping Lists","Shopping List","shoppingList");
   
   appTableSchemaSetup("listItems",[
-  {field:"itemName",type:"text",caption:"Item Name"}
-  ]);
+  {field:"itemName",type:"text",caption:"Item Name",colWidth:400,inputWidth:300,listIndex:0,minLength:4},
+  {field:"uom",type:"text",caption:"UOM",size:15,colWidth:200,listIndex:0,minLength:2}
+  ],"List Items","List Item","listItem");
   
   appTableSchemaSetup("shoppingListItems",[
   {field:"shoppingListId",type:"fk",fkTable:"shoppingLists"},
   {field:"listItemId",type:"fk",fkTable:"listItems"},
-  {field:"qty",type:"number",caption:"Item Name"}
-  ]);
+  {field:"qty",type:"number",caption:"Item Name",minLength:1}
+  ],"Shopping List Items","Shopping List Item","shoppingListItem");
   
-  appTableSchemaSetup("listItemLocation",[
+  appTableSchemaSetup("listItemLocations",[
   {field:"listItemId",type:"fk",fkTable:"listItems"},
   {field:"storeId",type:"fk",fkTable:"stores"},
-  {field:"aisle",type:"text",caption:"Aisle"},
-  {field:"aisleSection",type:"text",caption:"Aisle"}
-  ]);
+  {field:"aisle",type:"text",caption:"Aisle",minLength:1},
+  {field:"aisleSection",type:"text",caption:"Aisle",minLength:1}
+  ],"List Item Locations","List Item Location","listItemLocation");
   
   appTableSchemaSetup("stores",[
-  {field:"storeName",type:"text",caption:"Store Name"}
-  ]);
+  {field:"storeName",type:"text",caption:"Store Name",colWidth:400,inputWidth:300,listIndex:0,minLength:2}
+  ],"Stores","Store","store");
   
   //shoppingListItems
   
@@ -307,12 +389,27 @@ function setupSchemaDefinition() {
 /*************************************************************************
 
  *************************************************************************/
-function appTableSchemaSetup(sTableName, fields) {
+function appTableSchemaSetup(sTableName, fields, sLabelPlural, sLabelSingular,sRecordType) {
   let schema = {};
+  let sPk = sTableName;
+  
+  if (sPk.substr(sPk.length-1,1) === "s") {
+    console.log("table name ends with 's'");
+    sPk = sPk.substr(0,sPk.length-1);    
+  } // end if
   
   schema.tableName = sTableName;
   schema.fields = fields;
+  schema.labelPlural = sLabelPlural;
+  schema.labelSingular = sLabelSingular;
+  schema.recordType = sRecordType;
+  schema.pkField = sPk+"Id";
+  console.log("pk="+schema.pkField);
+  
   appSchemaDataByIndex.push(schema);
+  
+  console.log(" --- added table schema: "+sTableName);
+  
 } // end of function appTableSchemaSetup()
 
 
@@ -336,13 +433,15 @@ function deviceRegistered(dataInput) {
 /*************************************************************************
 
  *************************************************************************/
-function deviceRegistered2(dataInput,doneTaskFunction,taskFailedFunction) {
+function deviceRegistered2(dataInput,doneTaskFunction) {
   console.log("deviceRegistered2() called");
   
- // returnPayload.payloadStatus = "success";
+  let returnPayload = {};
+ 
+  returnPayload.payloadStatus = "success";
   
   
-  return;
+  doneTaskFunction(returnPayload);
 } // end of function deviceRegistered2()
 
 
@@ -420,6 +519,9 @@ function getCurrentUserInfo(dataInput, returnPayload) {
   db.find({ recordType: 'user',emailAdr: dataInput.userEmailAdr}, function (err, docs) {
     if (err) {
       returnPayload.currentUserInfo.payloadStatus = "error";
+      returnPayload.errorOrigin = "server";
+      returnPayload.attemptedOperation = "db.find on user";
+      returnPayload.jsFunctionName = "getCurrentUserInfo()";
       return;
     } // end if
     
@@ -435,22 +537,12 @@ function getCurrentUserInfo(dataInput, returnPayload) {
 
    called from "getFutureAppts" command
  *************************************************************************/
-function getFutureAppts(dataInput, returnPayload) {
+function getFutureAppts(dataInput) {
   console.log("getFutureAppts() called");
-  
-  
-  db.find({ recordType: 'appointment',apptDateMs: {$gt:0 }}, function (err, docs) {
-    if (err) {
-      returnPayload.futureAppointments.payloadStatus = "error";
-      return;
-    } // end if
     
-    returnPayload.payloadStatus = "success";
-    returnPayload.data = docs;
+  dbTaskProc.addTask(getFutureApptsProc);
+  dbTaskProc.performTasks(dataInput);
     
-    return;
-  }); // end of db.find() call-back block
-  
 } // end of function getFutureAppts() 
 
 
@@ -458,24 +550,116 @@ function getFutureAppts(dataInput, returnPayload) {
 
    called from "getFutureAppts" command
  *************************************************************************/
-function getFutureApptsProc(dataInput, returnPayload) {
-  console.log("getFutureAppts() called");
-  
+function getFutureApptsProc(dataInput,doneTaskFunction, taskFailedFunction) {
+  console.log("getFutureApptsProc() called");
+  let returnPayload = {};
   
   db.find({ recordType: 'appointment',apptDateMs: {$gt:0 }}, function (err, docs) {
     if (err) {
-      returnPayload.futureAppointments.payloadStatus = "error";
+      returnPayload.payloadStatus = "error";
+      returnPayload.errorOrigin = "server";
+      returnPayload.attemptedOperation = "db.find on appointment";
+      returnPayload.jsFunctionName = "getFutureApptsProc()";
+      taskFailedFunction(returnPayload);
       return;
     } // end if
     
     returnPayload.payloadStatus = "success";
     returnPayload.data = docs;
-    
+    doneTaskFunction(returnPayload);
     return;
   }); // end of db.find() call-back block
   
 } // end of function getFutureApptsProc() 
 
+
+
+
+
+/*************************************************************************
+ kick off getting records based on query and return them to the client...
+ *************************************************************************/
+function getRecs(dataInput) {
+  console.log("getRecs() called");
+    
+  dbTaskProc.addTask(getRecsProc);
+  dbTaskProc.performTasks(dataInput);
+} // end of function getRecs()
+
+
+
+/*************************************************************************
+ get records based on query and return them to the client...
+ *************************************************************************/
+function getRecsProc(dataInput,doneTaskFunction, taskFailedFunction) {
+  console.log("getRecsProc() called");
+  let returnPayload = {};
+  
+  const sRecordType = dataInput.recordType;
+  let queryObj = {recordType:sRecordType}; // return all records for record type
+  
+  if (typeof dataInput.queryParams === "object") {
+    // filter some more...
+    console.log("--- filtering more...");
+  } // end if
+  
+  db.find(queryObj, function (err, docs) {
+    if (err) {
+      returnPayload.payloadStatus = "error";
+      returnPayload.errorOrigin = "server";
+      returnPayload.attemptedOperation = "db.find for record type: "+sRecordType;
+      returnPayload.jsFunctionName = "getRecsProc()";
+      taskFailedFunction(returnPayload);
+      return;
+    } // end if
+    
+    returnPayload.payloadStatus = "success";
+    returnPayload.data = docs;
+    doneTaskFunction(returnPayload);
+    return;
+  }); // end of db.find() call-back block
+  
+} // end of function getRecsProc()
+
+
+
+
+/*************************************************************************
+
+ *************************************************************************/
+function getUsers(dataInput) {
+  console.log("getUsers() called");
+  
+  dbTaskProc.addTask(getUsersProc);
+  dbTaskProc.performTasks(dataInput);
+} // end of function getUsers()
+
+
+
+
+/*************************************************************************
+
+ *************************************************************************/
+function getUsersProc(dataInput,doneTaskFunction, taskFailedFunction) {
+  console.log("getUsersProc() called");
+  let returnPayload = {};
+  
+  db.find({ recordType: 'user'}, function (err, docs) {
+    if (err) {
+      returnPayload.payloadStatus = "error";
+      returnPayload.errorOrigin = "server";
+      returnPayload.attemptedOperation = "db.find on user";
+      returnPayload.jsFunctionName = "getUsersProc()";
+      taskFailedFunction(returnPayload);
+      return;
+    } // end if
+    
+    returnPayload.payloadStatus = "success";
+    returnPayload.data = docs;
+    doneTaskFunction(returnPayload);
+    return;
+  }); // end of db.find() call-back block
+} // end of function getUsers()
 
 
 /*************************************************************************
@@ -485,9 +669,28 @@ function getFutureApptsProc(dataInput, returnPayload) {
  *************************************************************************/
 function resetApp(dataInput, returnPayload) {
   console.log("called resetApp() function");
+  dbTaskProc.addTask(resetAppProc);
+  dbTaskProc.performTasks(dataInput);
+} // end of function resetApp()
+
+
+
+
+
+/*************************************************************************
+
+   called from "resetApp" command
+   used while testing
+ *************************************************************************/
+function resetAppProc(dataInput,doneTaskFunction, taskFailedFunction) {
+  console.log("called resetAppProc() function");
+  
+  let returnPayload = {};
+  
   // fall back values:
   returnPayload.payloadStatus = "error";
   returnPayload.info = "invalid API call";
+  // doneTaskFunction(returnPayload);
   // return;
   // uncomment line above when done testing!!
   
@@ -502,7 +705,87 @@ function resetApp(dataInput, returnPayload) {
   handleAdminUser(); 
   
   returnPayload.payloadStatus = "success";
-} // end of function resetApp()
+  doneTaskFunction(returnPayload);
+} // end of function resetAppProc()
+
+
+
+/*************************************************************************
+
+ *************************************************************************/
+function saveRec(dataInput) {
+  console.log("saveRec() called");
+  
+  dbTaskProc.addTask(saveRecProc);
+  dbTaskProc.performTasks(dataInput);
+} // end of function saveRec(dataInput)
+
+
+
+
+/*************************************************************************
+
+ *************************************************************************/
+function saveRecProc(dataInput,doneTaskFunction, taskFailedFunction) {
+  console.log("saveRecProc() called");
+  const saveObj = dataInput.recData;
+  const returnPayload = {};
+  
+  if (typeof saveObj["_id"] === "undefined") {
+    // save new record:
+    
+    saveObj.createDate = new Date();
+    saveObj.updateDate = saveObj.createDate;
+    
+    console.log("inserting new record");
+    db.insert(saveObj, function(err2, newDoc) {
+      if (err2) {
+        returnPayload.payloadStatus = "error";
+        returnPayload.errorOrigin = "server";
+        returnPayload.attemptedOperation = "db.insert ";
+        returnPayload.jsFunctionName = "saveRecProc()";
+        taskFailedFunction(returnPayload);
+        return;
+      } // end if
+      
+      returnPayload.newId = newDoc["_id"];
+      returnPayload.payloadStatus = "success";
+      returnPayload.saveOperation = "insert";
+      returnPayload.savedRec = newDoc;
+      
+      doneTaskFunction(returnPayload);
+      return;
+    }); // end of db.insert call-back block
+  } else {
+    // update existing record:
+    const sId = saveObj["_id"];
+    saveObj.updateDate = saveObj.createDate;
+    
+    console.log("updating existing record with an id of: "+sId);
+    db.update({ '_id': sId }, saveObj, function (err2, numReplaced) {
+      if (err2) {
+        returnPayload.payloadStatus = "error";
+        returnPayload.errorOrigin = "server";
+        returnPayload.attemptedOperation = "db.update ";
+        returnPayload.jsFunctionName = "saveRecProc()";
+        taskFailedFunction(returnPayload);
+        return;
+      } // end if
+      
+      returnPayload.payloadStatus = "success";
+      returnPayload.saveOperation = "update";
+      returnPayload.savedRec = saveObj;
+      
+      doneTaskFunction(returnPayload);
+      return;
+    });// end of db.update call-back block
+  } // end if/else
+  
+  
+  
+} // end of function saveRecProc(dataInput)
+
+
 
 
 
@@ -656,6 +939,7 @@ function DbTaskProcessor() {
 
         response.json(rData);
         console.log("response sent - all done processing db tasks and sending back any results");
+        console.log("############################################################################################");
       } // end if (response)
 
     } // end if
@@ -667,7 +951,7 @@ function DbTaskProcessor() {
   /*************************************************************************
   *************************************************************************/
   function doneTask(inpTaskResults) {
-    console.log("doneTask() method called");
+    console.log("doneTask() function called");
     
     inpTaskResults.resultTimestamp = new Date();    
 
@@ -686,7 +970,7 @@ function DbTaskProcessor() {
   /*************************************************************************
   *************************************************************************/
   function taskFailed(inpTaskResults) {
-    console.log("taskFailed() method called");
+    console.log("taskFailed() function called");
     
 
     bErrorsOccurred = true;    
