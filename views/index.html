@@ -33,11 +33,13 @@
             integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="   
             crossorigin="anonymous"></script>
     
-    <script src="/maint.js" defer></script>
     <script src="/ui.js" defer></script>
     <script src="/app.js" defer></script>
   </head>
   <body>
+    <div style="display:none;">
+      <img src="https://cdn.glitch.com/a2964a8f-6339-465f-8a8d-329fd8d12c43%2Fspinner.gif?v=1565725966705" id="spinnerImage">
+    </div>
     
     <div id="splash">
       <h2>For Mom</h2>
@@ -47,11 +49,8 @@
     </div><!-- splash -->
     
     <div id="menu">
-      <span>Hello <span id="userNameLabel">So-and-so</span></span>
-      <ul id="menuList">
-        
-        
-      </ul>
+      <span>Hello <span id="userNameLabel">So-and-so</span>!</span>
+      <ul id="menuList"></ul>
       <div id="appInfo"></div>
     </div><!-- menu -->
     
@@ -60,6 +59,7 @@
       The the application's <i>.env</i> file has not been set up correctly.
     </div>
     
+    <div id="pageContent"></div>
     
     <div id="registerDevicePanel">
       This application has not been registered on this device yet.
@@ -84,7 +84,7 @@
       
     </div><!-- info1 -->
     
-    <button onclick="resetAppRequest()">
+    <button class="resetBtn" onclick="resetAppRequest()">
       Reset App...
     </button>
     
