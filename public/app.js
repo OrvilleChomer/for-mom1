@@ -5,7 +5,7 @@
  *************************************************************************/
 
 
-const app = {};
+let app = {};
 
 
 // some major DOM node elements' global variable declaration:
@@ -16,6 +16,7 @@ const registerDevicePanelNd = document.getElementById("registerDevicePanel");
 const info1Nd = document.getElementById("info1");
 const installToHomeScreenInitPromptNd = document.getElementById("installToHomeScreenInitPrompt");
 const menuNd = $("#menu")[0];
+const pageContentNd = $("#pageContent")[0];
 
 const sHdrInfo = window.navigator.userAgent;
 let bIsStandalone = false;
@@ -29,14 +30,19 @@ let w,h;
 *************************************************************************/
 function initAppObj() {
   console.log("initAppObj() function called");
+  app = {};
   app.pin = getLocalValue('pin');
   app.userEmailAdr = getLocalValue('userEmailAdr');
+  
   app.schemaInfoByIndex = [];
   app.schemaInfoByTableName = [];
+  app.schemaInfoByRecordType = [];
   app.appointmentsByIndex = [];
   app.appointmentsByServerId = [];
   app.appointmentDatesByIndex = [];
   app.appointmentDatesByServerId = [];
+  app.ajaxLogByIndex = [];
+  app.logAjax = true;
 } // end of function initAppObj()
 
  
@@ -52,8 +58,14 @@ async function apiCall(cmd, dataPosted, fnSuccess,fnFailure) {
   dataPosted.cmd = cmd;
   dataPosted.needSchemaInfo = false;
   dataPosted.needCurrentUserInfo = false;
+  const startTime = new Date();
   
   let test = app;
+  
+  const ajaxLogEntry = {};
+  
+  ajaxLogEntry.cmd = cmd;
+  ajaxLogEntry.notes = [];
   
   if (app.schemaInfoByIndex.length===0) {
     dataPosted.needSchemaInfo = true; // need the server to return the schema definitions
@@ -72,6 +84,9 @@ async function apiCall(cmd, dataPosted, fnSuccess,fnFailure) {
     dataPosted.pin = app.pin;
   } // end if
   
+  ajaxLogEntry.dataPosted = dataPosted;
+  ajaxLogEntry.startTime = startTime;
+  
   const options = {
     method:'POST',
     body:JSON.stringify(dataPosted),
@@ -89,36 +104,50 @@ async function apiCall(cmd, dataPosted, fnSuccess,fnFailure) {
       // OK
       console.log("API call returned a result of 'ok'");
 
+      ajaxLogEntry.endTime = new Date();
+      
       if (app.schemaInfoByIndex.length===0 && returnedData.schemaInfoByIndex) {
         console.log("setting up schema definitions locally that were returned from the server...");
+        ajaxLogEntry.notes.push("adding schema");
         app.schemaInfoByIndex = returnedData.schemaInfoByIndex;
         let nMax = app.schemaInfoByIndex.length;
         let n;
-        
+
         for (n=0;n<nMax;n++) {
           let tbl = app.schemaInfoByIndex[n];
           console.log(" --- setting up table name: "+tbl.tableName);
           app.schemaInfoByTableName[tbl.tableName] = tbl;
+          app.schemaInfoByRecordType[tbl.recordType] = tbl;
         } // next n
       } // end if (end of processing schema info)
       
       if (typeof fnSuccess === 'function') {
         console.log("about to call 'success' function (as a result of a successful server call)...");
         fnSuccess(dataPosted,returnedData);
+        ajaxLogEntry.notes.push("success function called");
       } // end if
+      
+      if (app.logAjax) {
+        app.ajaxLogByIndex.push(ajaxLogEntry);
+      } // end if
+      
     } else {
       // NOT OK
       console.log("API call did NOT return a result of 'ok'... it returned: "+returnedData.result);
+      ajaxLogEntry.endTime = new Date();
+      ajaxLogEntry.returnedData = returnedData;
       
       if (returnedData.info === 'site setup error') {
         console.log("server returned a site setup error");
         showConfigProblemPanel();
+        ajaxLogEntry.notes.push("showConfigProblemPanel() called");
         return;
       } // end if
       
       if (returnedData.info === 'invalid API call') {
         console.log("server returned an invalid API call error message - current client device needs to be registered");
         showDeviceRegistrationPanel();
+        ajaxLogEntry.notes.push("showDeviceRegistrationPanel() called");
         return;
       } // end if
       
@@ -126,17 +155,33 @@ async function apiCall(cmd, dataPosted, fnSuccess,fnFailure) {
         console.log("about to call 'failure' function (as a result of server error)...");
         fnFailure(dataPosted,returnedData);
       } // end if
+      
+      
+      if (app.logAjax) {
+        app.ajaxLogByIndex.push(ajaxLogEntry);
+      } // end if
+      
     } // end if
   } catch(err) {
+    ajaxLogEntry.endTime = new Date();
     let returnedData = {};
     returnedData.result = "jsError";
+    returnedData.jsFunctionName = "apiCall()";
+    returnedData.errorOrigin = "client";
     returnedData.message = err.message;
     returnedData.fileName = err.fileName;
     returnedData.lineNumber = err.lineNumber;
+    
+    ajaxLogEntry.returnedData = returnedData;
+    
     if (typeof fnFailure === 'function') {
         console.log("about to call 'failure' function (for Js error)...");
         fnFailure(dataPosted,returnedData);
     } // end if
+    
+    if (app.logAjax) {
+        app.ajaxLogByIndex.push(ajaxLogEntry);
+      } // end if
   } // end of try/catch
   
 } // end of function apiCall()
@@ -243,6 +288,14 @@ function pageResize() {
   h = window.innerHeight;
   
   resizePanel(splashNd);
+  
+  menuNd.style.height = (h-90)+"px";
+  pageContentNd.style.height = menuNd.style.height;
+  pageContentNd.style.width = (w)+"px";
+  
+  const installToHomeScreenInitPromptNd = $("#installToHomeScreenInitPrompt")[0];
+  installToHomeScreenInitPromptNd.style.top = (h-45)+"px";
+  installToHomeScreenInitPromptNd.style.width = (w-45)+"px";
 } // end of function pageResize()
 
 
@@ -303,6 +356,11 @@ function buildMenu() {
   s.push("</li>");
   
   s.push("<li class='mnuItm'>");
+  s.push("<button class='mnuBtn' onclick='editStoreNames()'>Edit Store Names</button>");
+  s.push("</li>");
+  
+  
+  s.push("<li class='mnuItm'>");
   s.push("<button class='mnuBtn' onclick='editShoppingList()'>Shopping List</button>");
   s.push("</li>");
   
@@ -332,6 +390,56 @@ function buildMenu() {
   } // next n
   
 } // end of function buildMenu()
+
+
+
+
+/*************************************************************************
+ *************************************************************************/
+function editShoppingListItems() {
+  console.log("editShoppingListItems() function called");
+  menuNd.style.display = "none";
+ 
+  buildBasicListUi({forTable:"listItems",containerDomEl:pageContentNd,addButton:true});
+} // end of function editShoppingListItems()
+
+
+
+
+/*************************************************************************
+ *************************************************************************/
+function editStoreNames() {
+  console.log("editStoreNames() function called");
+  menuNd.style.display = "none";
+ 
+  buildBasicListUi({forTable:"stores",containerDomEl:pageContentNd,addButton:true});
+} // end of function editStoreNames()
+
+
+
+
+
+/*************************************************************************
+ *************************************************************************/
+function editUsers() {
+  console.log("editUsers() function called");
+  menuNd.style.display = "none";
+  //buildBasicListUi({forTable:"users",cmd:"getUsers",saveCmd:"updateUserInfo",containerDomEl:pageContentNd,addButton:true});
+  buildBasicListUi({forTable:"users",containerDomEl:pageContentNd,addButton:true});
+}// end of function editUsers() 
+
+
+
+
+/*************************************************************************
+ *************************************************************************/
+function editWeeklyReminders() {
+  console.log("editWeeklyReminders() function called");
+  menuNd.style.display = "none";
+  buildBasicListUi({forTable:"weeklyReminders",containerDomEl:pageContentNd,addButton:true});
+} // end of function editWeeklyReminders()
+
+
 
 
 
