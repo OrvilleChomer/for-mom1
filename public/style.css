@@ -6,24 +6,44 @@
 }
 
 
+.addBtn {
+  position:absolute;
+  top:2px;
+  width:45px;
+  height:45px;
+  padding:0px;
+}
 
 body {
   font-family: "Benton Sans", "Helvetica Neue", helvetica, arial, sans-serif;
   margin: 0;
   padding:0;
   background-color:#00b8e6;
+  overflow:hidden;
 }
 
 .bold {
   font-weight: bold;
 }
 
-h1 {
-  font-style: italic;
-  color: #373fff;
+
+button {
+  font-size: 16px;
+  border-radius: 3px;
+  background-color: lightgrey;
+  border: 1px solid grey;
+  box-shadow: 2px 2px teal;
+  cursor: pointer;
+  height:40px;
 }
 
+button:hover {
+  background: silver;
+}
 
+button:active {
+  box-shadow: none;
+}
 
 
 #configProblemPanel {
@@ -34,9 +54,167 @@ h1 {
   display:none;
 }
 
+
+.editTitle {
+  position:absolute;
+  left:70px;
+  top:6px;
+  height:45px;
+  overflow:hidden;
+  font-weight:bold;
+  font-size:24pt;
+}
+
+
+.exitEditBtn {
+  position:absolute;
+  left:2px;
+  top:2px;
+  width:45px;
+  height:45px;
+  padding:0px;
+}
+
+
+#frmPanel {
+  position:absolute;
+  left:2px;
+  top:60px;
+}
+
+#frmMsgs {
+  margin-left:10px;
+  color:red;
+}
+
+
+h1 {
+  font-style: italic;
+  color: #373fff;
+}
+
+
+
+
+
+#installToHomeScreenInitPrompt {
+  display:none;
+  position:absolute;
+  left:0px;
+  z-index:100;
+  height:40px;
+}
+
+input {
+  display: block;
+  margin-bottom: 10px;
+  padding: 5px;
+  border: 1px solid lightgrey;
+  border-radius: 3px;
+  font-size: 16px;
+}
+
+li {
+  margin-bottom: 5px;
+}
+
+
+#lstArea {
+  position:absolute;
+  overflow-x:hidden;
+  overflow-y:scroll;
+  border:solid blue 1px;
+  background:white;
+  margin:0px;
+  padding:0px;
+}
+
+.lstCell {
+  position:absolute;
+  overflow:hidden;
+  height:55px;
+  line-height:55px;
+  font-size:20pt;
+}
+
+/* list header Formatting: */
+.lstHdr {
+  border:solid silver 1px;
+  background:silver;
+  color:black;
+  overflow:hidden;
+}
+
+/* list header Col Formatting: */
+.lstHdrCol {
+  border:solid gray 1px;
+  background:silver;
+  color:black;
+  font-weight:bold;
+  overflow:hidden;
+}
+
+
+.lstRow:hover {
+  background: #b3d9ff;
+}
+
+
+.lstRow {
+  position:absolute;
+  overflow:hidden;
+  border-bottom:solid silver 1px;
+  height:55px;
+  cursor:pointer;
+  background: white;
+}
+
+
+#menu {
+  display: none;
+  position:absolute;
+  left:0;
+  top:45px;
+  border:solid lightgreen 1px;
+  background:lightgreen;
+  overflow-x:hidden;
+  overflow-y:scroll;
+}
+
+
+
+
+#menuList {
+  list-style-type:none;
+  padding:15px;
+}
+
+
+.mnuBtn {
+  font-size:20pt;
+  height:50px;
+  margin-bottom:12px;
+}
+
+
+
+#pageContent {
+  background-color: lightyellow;
+  position:absolute;
+  left:0;
+  top:40px;
+  border:solid lightyellow 1px;
+  overflow:hidden;
+  display: none;
+}
+
+
+
+
 #refreshPage {
   display:none; 
   height:90px;
+  z-index:1000;  /*  try to make sure button is always on top */
 }
 
 
@@ -50,56 +228,24 @@ h1 {
   display:none;
 }
 
-#installToHomeScreenInitPrompt {
+
+.resetBtn {
+  z-index:1000;
+  position:absolute;
+  color:yellow;
+  font-weight:bold;
+  background:red;
+  left:5px;
+  top:0px;
   display:none;
 }
 
-input {
-  display: block;
-  margin-bottom: 10px;
-  padding: 5px;
-  border: 1px solid lightgrey;
-  border-radius: 3px;
-  font-size: 16px;
+#spinner {
+  position:absolute;
+  width:130px;
+  height:130px;
 }
 
-#menu {
-  display: none;
-}
-
-.mnuBtn {
-  font-size:20pt;
-  height:50px;
-  margin-bottom:12px;
-}
-
-
-#menuList {
-  list-style-type:none;
-  padding:15px;
-}
-
-button {
-  font-size: 16px;
-  border-radius: 3px;
-  background-color: lightgrey;
-  border: 1px solid grey;
-  box-shadow: 2px 2px teal;
-  cursor: pointer;
-  height:40px;
-}
-
-button:hover {
-  background-color: yellow;
-}
-
-button:active {
-  box-shadow: none;
-}
-
-li {
-  margin-bottom: 5px;
-}
 
 #splash {
   background:green;
