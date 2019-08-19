@@ -70,7 +70,7 @@ function applyFormUiInputs(params) {
   for(n=0;n<nMax;n++) {
     fld = tblSchema.fields[n];
     
-    if (fld.type === "text" || fld.type === "number" || fld.type === "email" || fld.type === "date") {
+    if (fld.type === "text" || fld.type === "number" || fld.type === "email" || fld.type === "weekday") {
     
       console.log("validating input field id: #frmItm"+fld.field);
       const inp = $("#frmItm"+fld.field)[0];
@@ -102,7 +102,28 @@ function applyFormUiInputs(params) {
 
       } // end if input value different than current object value
     
-    } // end if an editable field type
+    } // end if an editable field type (using "value" attribute on INPUT or SELECT tags)
+    
+    
+    // save checkbox values:
+    if (fld.type === "boolean") {
+      console.log("validating input (checked) field id: #frmItm"+fld.field);
+      const inp = $("#frmItm"+fld.field)[0];
+      
+      if (inp.checked) {
+        if (updatedObj[fld.field] !== "Y") {
+          updatedObj[fld.field] = "Y";
+          bChangesMade = true;
+        } // end if
+      } else {
+        if (updatedObj[fld.field] !== "N") {
+          updatedObj[fld.field] = "N";
+          bChangesMade = true;
+        } // end if
+      } // end if/else
+      
+    } // end if (save checkbox values)
+    
     
   } // next n
   
@@ -160,7 +181,8 @@ function applyFormUiInputsSuccess(dataPosted, dataReturned) {
   const frmMsgsNd = $("#frmMsgs")[0];
   frmMsgsNd.innerHTML = "Changes Saved Successfully...";
   
-  currEditObj = dataReturned.returnPayload[0].savedRec;
+ // currEditObj = dataReturned.returnPayload[0].savedRec;
+  currEditObj = dataReturned.returnPayloadByTagName["saveRec"];
   
   addRecDataToModel(currEditObj);
   
@@ -197,6 +219,199 @@ function applyFormUiInputsFailure(dataPosted, dataReturned) {
 
 
 
+/*************************************************************************
+
+*************************************************************************/
+function buildCalendarCtlPopup(params) {
+  console.log("buildCalendarCtlPopup() function called");
+  let s=[];
+  let sCaption = "Select Date";
+  let pickDate = new Date();
+  let n,n2;
+  let nTop;
+  let nLeft;
+  const nPageWidth = w;
+  let nPopupOffset = Math.floor(nPageWidth * .05);
+  let nPopupWidth = nPageWidth - (nPopupOffset * 2);
+  let nPopupHeight = nPopupWidth + Math.floor(nPopupWidth * 2);
+  let nBlockSize = Math.floor(nPopupWidth / 7.5);
+  
+  let nYear = pickDate.getFullYear();
+  const todaysDate = new Date();
+  const Q = '"';
+  const calPopupNd = $("#calPopup")[0];
+  const firstDateInMonth = new Date();
+  firstDateInMonth.setDate(1);
+  firstDateInMonth.setMonth(pickDate.getMonth());
+  firstDateInMonth.setFullYear(pickDate.getFullYear());
+  const nStartWeekDay = firstDateInMonth.getDay();
+  const nTotDaysInMonth = getTotalDaysInMonth(pickDate);
+  
+  const sMonthName = getFullMonthName(pickDate);
+  
+  s.push("<div class='calCaption'>");
+  s.push(sCaption);
+  s.push(":</div>"); // calCaption
+  
+  
+  s.push("<div class='calWrapper'>");
+  
+  s.push("<div class='calMonthYear'>");
+  s.push("<span class='calMonthName'>"+sMonthName+"&nbsp;</span>");
+  s.push("<span class='calYear'>"+pickDate.getFullYear()+"</span>");
+  s.push("</div>"); // calMonthYear
+  
+  s.push("<button class='calBtn' ");    
+  s.push("title='previous month' ");
+  s.push("style="+Q);
+  s.push("left:"+(nPopupWidth - 135)+"px;");
+  s.push(Q);
+  s.push(">");
+  s.push("&lt;</button>");
+  
+  
+  s.push("<button class='calBtn' ");    
+  s.push("title='jump to today' ");
+  s.push("style="+Q);
+  s.push("left:"+(nPopupWidth - 105)+"px;");
+  s.push(Q);
+  s.push(">");
+  s.push("Today</button>");
+  
+  
+  // next month button
+  s.push("<button class='calBtn' ");    
+  s.push("title='next month' ");
+  s.push("style="+Q);
+  s.push("left:"+(nPopupWidth - 40)+"px;");
+  s.push(Q);
+  s.push(">");
+  s.push("&gt;</button>");
+
+    nTop = 50;
+    const sDays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    nLeft = 20;
+    for (n=0;n<7;n++) {
+      s.push("<div class='calWeekday' ");
+      s.push("style="+Q);
+      s.push("left:"+(nLeft)+"px;");
+      s.push("top:"+(nTop)+"px;");
+      s.push("width:"+(nBlockSize)+"px;");
+      s.push("height:"+(nBlockSize)+"px;");
+      
+      if (n===0 || n===6) {
+        s.push("color:gray;");
+      } // end if
+      
+      s.push(Q);
+      s.push(">");
+      s.push(sDays[n]);
+      s.push("&nbsp;</div>");
+      nLeft = nLeft + nBlockSize - 1;
+    } // next n
+  
+    let weekDate = 0;
+    nTop = 72;
+  
+    
+    for (n=0;n<6;n++) {
+      
+      nLeft = 20;
+      for (n2=0;n2<7;n2++) {
+        let sClass = "calBlock1";
+        
+        if (n2===0 || n2===6) {
+          sClass = "calBlock2";
+        } // end if
+        
+        s.push("<div class='"+sClass+"' ");
+        s.push("style="+Q);
+        s.push("left:"+(nLeft)+"px;");
+        s.push("top:"+(nTop)+"px;");
+        s.push("width:"+(nBlockSize)+"px;");
+        s.push("height:"+(nBlockSize)+"px;");
+        
+        s.push(Q);
+        s.push(">");
+        
+        if (weekDate===0) {
+          if (nStartWeekDay===n2) {
+            weekDate = weekDate + 1;
+          } // end if
+        } else {
+          weekDate = weekDate + 1;
+        } // end if/else
+        
+        if (weekDate>0 && weekDate <= nTotDaysInMonth) {
+          // display any info for actual date...
+          let bIsToday = false;
+          let testDate = new Date();
+          testDate.setFullYear(nYear);
+          testDate.setMonth(pickDate.getMonth());
+          testDate.setDate(weekDate);
+          
+          if (todaysDate.getDate() === testDate.getDate() &&
+              todaysDate.getMonth() === testDate.getMonth() &&
+              todaysDate.getFullYear() === testDate.getFullYear()) {
+              bIsToday = true;
+          } // end if
+          
+          s.push("<div ");
+          
+          if (bIsToday) {
+            s.push("class='calToday' ");
+          } else {
+            s.push("class='calOtherDays' ");
+          } // end if
+          
+          s.push("style="+Q);
+          s.push("position:absolute;");
+          s.push("right:6px;");
+          s.push("top:3px;");
+          
+          if (!bIsToday) {
+            if (n2===0 || n2===6) {
+              s.push("color:gray;");
+            } // end if
+          } // end if
+          
+          s.push(Q);
+          s.push(">");
+          s.push(""+(weekDate)); // a number from 1 to 31 !!!
+          s.push("</div>");
+        } // end if
+        
+        s.push("</div>"); // end of calBlock
+        nLeft = nLeft + nBlockSize - 1;
+      } // next n2 (day)
+      nTop = nTop + nBlockSize - 1;
+    } // next n (week)
+  
+    nTop = nTop + 10;
+    s.push("<button ");    
+    s.push("title='cancel' ");
+    s.push("onclick="+Q);
+    s.push("hideCalendarCtl()"+Q+" ");
+  
+    s.push("style="+Q);
+    s.push("position:absolute;");
+    s.push("left:15px;");
+    s.push("width:250px;");
+    s.push("top:"+(nTop)+"px;");
+    s.push(Q);
+    s.push(">");
+    s.push("Cancel Date Selection</button>");
+  
+  s.push("</div>"); // end of calWrapper
+  
+  calPopupNd.style.left = (nPopupOffset)+"px";
+  calPopupNd.style.top = (nPopupOffset)+"px";
+  calPopupNd.style.width = (nPopupWidth)+"px";
+  calPopupNd.style.height = (nPopupHeight)+"px";
+  calPopupNd.innerHTML = s.join("");
+  calPopupNd.style.display = "block";
+  tintNd.style.display = "block";
+} // end of function buildCalendarCtl
 
 
 /*************************************************************************
@@ -254,14 +469,23 @@ function buildFormUi(params) {
   
   for (n=0;n<nMax;n++) {
     fld = tblSchema.fields[n];
+    let sCaption;
     
-    if (fld.type === "text" || fld.type === "number" || fld.type === "email" || fld.type === "date" || fld.type==="weekday") {
+    // is this a kind of field editable in the UI?
+    if (fld.type === "text" || fld.type === "number" || 
+        fld.type==="memo" || fld.type === "boolean" || fld.type === "datetime" || 
+        fld.type === "email" || fld.type === "date" || fld.type==="weekday") {
+      
       s.push("<tr><td nowrap>");
       sCaption = fld.field;
       
       if (typeof fld.caption === "string") {
         sCaption = fld.caption;
       } // end if
+      
+      if (app.mobileDevice && typeof fld.mobileCaption === "string") {
+          sCaption = fld.mobileCaption;
+        } // end if
       
       s.push(sCaption+":</td>");
       
@@ -270,10 +494,42 @@ function buildFormUi(params) {
       
       // INPUT tag related UI:
       
-      if (fld.type==="text" || fld.type==="number" || fld.type==="email" || fld.type==="memo") {
+      if (fld.type==="text" || fld.type==="number" || fld.type==="email") {
         s.push("<input ");
         s.push("id='frmItm"+fld.field+"' ");
         s.push("type='"+fld.type+"' ");
+        
+        
+        if (fld.type === "number") {
+          s.push("class='numberInput' ");
+          let nMin = 0;
+          let nMax = 1000;
+          let nStep = .05;
+          
+          if (typeof fld.min === "number") {
+            nMin = fld.min;
+          } // end if
+          
+          if (typeof fld.max === "number") {
+            nMax = fld.max;
+          } // end if
+          
+          if (typeof fld.step === "number") {
+            nStep = fld.step;
+          } // end if
+          
+          s.push("min='"+nMin+"' ");
+          s.push("max='"+nMax+"' ");
+          
+          if (nStep>0) {
+            s.push("step='"+nStep+"' ");
+          } else {
+            s.push("step='any' ");
+          } // end if / else
+          
+        } // end if (fld.type === "number")
+        
+        
         s.push("style="+Q);
 
         if (fld.type === "email") {
@@ -288,6 +544,19 @@ function buildFormUi(params) {
         s.push(">");
       } // end if -- for input tag related UI...
       
+      if (fld.type==="boolean") {
+        s.push("<input ");
+        s.push("id='frmItm"+fld.field+"' ");
+        s.push("type='checkbox' ");
+        s.push("style="+Q);
+        
+        if (typeof fld.inputWidth === "number") {
+          s.push("width:"+fld.inputWidth+"px;");
+        } // end if
+
+        s.push(Q);
+        s.push(">");
+      } // end if
       
       if (fld.type==="memo") {
         s.push("<textarea rows='10' cols='60' ");
@@ -295,6 +564,28 @@ function buildFormUi(params) {
         s.push(">");
         s.push("</textarea>");
       } // end if - memo
+      
+      if (fld.type==="datetime") {
+        s.push("<div>"); // control container wrapper - open
+          s.push("<div class='datetimeCtrlCtr'>"); // control container - open
+            s.push("<input ");
+            s.push("class='dateTime' readonly ");
+            s.push("id='frmItm"+fld.field+"' ");
+            s.push("style="+Q);
+
+            s.push(Q);
+            s.push(">");
+
+            s.push("<button ");
+            s.push("class='dateTimeButton' ");
+            s.push("onclick="+Q);
+            s.push("buildCalendarCtlPopup({'id':'frmItm"+fld.field+"'})");
+            s.push(Q);
+            s.push(">...</button>");
+          s.push("</div>"); // control container  - close
+        s.push("</div>"); // control container wrapper - close
+      } // end if - datetime
+      
       
       if (fld.type==="weekday") {
         s.push("<select ");
@@ -370,7 +661,7 @@ function buildFormUi(params) {
   for (n=0;n<nMax;n++) {
     fld = tblSchema.fields[n];
     
-    if (fld.type === "text" || fld.type === "number" || fld.type === "email" || fld.type === "date" || fld.type === "memo") {
+    if (fld.type === "text" || fld.type === "number" || fld.type === "email" || fld.type === "weekday" || fld.type === "memo") {
       console.log("populating input field id: #frmItm"+fld.field);
       const inp = $("#frmItm"+fld.field)[0];
       inp.value = recData[fld.field];
@@ -381,6 +672,16 @@ function buildFormUi(params) {
       } // end if
       
       bAValueLoaded = true;
+    } // end if ()
+    
+    if (fld.type === "boolean") {
+      const inp = $("#frmItm"+fld.field)[0];
+      if (recData[fld.field] === "Y") {
+        inp.checked = true;
+      } else {
+        inp.checked = false;
+      } // end if
+      inp.addEventListener("mouseup",clearFieldWarning);
     } // end if
     
   } // next n
@@ -467,7 +768,6 @@ function buildBasicListUi(params) {
     h.push("<div "); // list header wrapper (open)
     h.push("class='lstHdr' ");
     h.push("style='");
-    h.push("position:absolute;");
     h.push("left:0px;");
     h.push("top:"+nListTop+"px;");
     h.push("width:"+w+"px;");
@@ -497,6 +797,10 @@ function buildBasicListUi(params) {
         
         if (typeof fld.caption === "string") {
           sCaption = fld.caption;
+        } // end if
+        
+        if (app.mobileDevice && typeof fld.mobileCaption === "string") {
+          sCaption = fld.mobileCaption;
         } // end if
         
         h.push(sCaption); // col header text
@@ -569,11 +873,12 @@ function buildBasicListUiDataLoaded(dataPosted, dataReturned) {
   const appObj = app;
   
   try {
-    const data = dataReturned.returnPayload[0].data;
+    const getRecsDataReturned = dataReturned.returnPayloadByTagName["getRecs"];
+    const data = getRecsDataReturned.data;
     const s=[];
     const sTableName = dataPosted.tableName;
     const nMax = data.length;
-    const tblSchema = app.schemaInfoByTableName[sTableName];
+    const tblSchema = appObj.schemaInfoByTableName[sTableName];
     const nMax2 = tblSchema.listFieldsByIndex.length;
     const lstAreaNd = $("#lstArea")[0];
     const Q = '"';
@@ -618,6 +923,9 @@ function buildBasicListUiDataLoaded(dataPosted, dataReturned) {
 
         s.push("<div "); // field row cell opening tag
         s.push("class='lstCell' ");
+        s.push("title="+Q);
+        s.push(rowData[fld.field]);
+        s.push(Q+" ");
         s.push("style="+Q);
         s.push("top:0px;");
         s.push("left:"+(nLeft)+"px;");
@@ -735,6 +1043,10 @@ function exitRecEdit(params1) {
 
 
 
+
+
+
+
 /*************************************************************************
 
 *************************************************************************/
@@ -753,9 +1065,13 @@ function fixUpRecObj(recObj) {
       if (typeof fld.defValue === "undefined") {    
         if (typeof fld.type === "number") {
           recObj[fld.field] = 0; 
+        } else if (fld.type === "comments") {
+          recObj[fld.field] = []; 
+        } else if (fld.type === "boolean") {
+          recObj[fld.field] = "N"; 
         } else {
           recObj[fld.field] = ""; 
-        } // end if/else
+        } // end if/else if/else
       } else {
         recObj[fld.field] = fld.defValue;
       } // end if/else
@@ -765,6 +1081,55 @@ function fixUpRecObj(recObj) {
   
   return recObj;
 } // end of function fixUpRecObj()
+
+
+/*************************************************************************
+
+*************************************************************************/
+function getFullMonthName(dt) {
+  let nMonth = dt.getMonth();
+  const sMonthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  
+  return sMonthNames[nMonth];
+} // end of function getFullMonthName(dt)
+
+
+
+/*************************************************************************
+
+*************************************************************************/
+function getTotalDaysInMonth(dt) {
+  let nYear = dt.getFullYear();
+  let nMonth = dt.getMonth()+1;
+  
+  if (nMonth>11) {
+    nMonth = 1;
+    nYear = nYear + 1;
+  } // end if
+  
+  let firstDateOfNextMonth = new Date();
+  firstDateOfNextMonth.setFullYear(nYear);
+  firstDateOfNextMonth.setDate(1);
+  firstDateOfNextMonth.setMonth(nMonth);
+  const nMsInDay = 1000 * 60 * 60 * 24;
+  let lastDateOfCurrentMonth = new Date();
+  lastDateOfCurrentMonth.setTime(firstDateOfNextMonth.getTime()-nMsInDay);
+  
+  return lastDateOfCurrentMonth.getDate();
+}// end of function getTotalDaysInMonth()
+
+
+
+
+/*************************************************************************
+
+*************************************************************************/
+function hideCalendarCtl() {
+  const calPopupNd = $("#calPopup")[0];
+  calPopupNd.innerHTML = "";
+  calPopupNd.style.display = "none";
+  tintNd.style.display = "none";
+} // end of function hideCalendarCtl() 
 
 
 
@@ -782,7 +1147,6 @@ function saveFormUiInputs(params) {
   
   applyFormUiInputs(params);
 } // end of function saveFormUiInputs()
-
 
 
 
