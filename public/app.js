@@ -33,6 +33,8 @@ function initAppObj() {
   app = {};
   app.pin = getLocalValue('pin');
   app.userEmailAdr = getLocalValue('userEmailAdr');
+  app.mobileDevice = false;
+  app.desktopDevice = true;
   
   app.schemaInfoByIndex = [];
   app.schemaInfoByTableName = [];
@@ -98,6 +100,7 @@ async function apiCall(cmd, dataPosted, fnSuccess,fnFailure) {
 
     const response = await fetch('/api', options);
     console.log("about to process response returned from fetch()...");
+
     const returnedData = await response.json();
 
     if (returnedData.result === 'ok') {
@@ -123,6 +126,21 @@ async function apiCall(cmd, dataPosted, fnSuccess,fnFailure) {
       
       if (typeof fnSuccess === 'function') {
         console.log("about to call 'success' function (as a result of a successful server call)...");
+        returnedData.returnPayloadByTagName = [];
+        let nMax2 = returnedData.returnPayload.length;
+        for (let n=0;n<nMax2;n++) {
+          const taskData = returnedData.returnPayload[n];
+          
+          if (typeof taskData.taskTag === "string") {
+            returnedData.returnPayloadByTagName[taskData.taskTag] = taskData;
+            
+            if (taskData.taskTag === "currentUserInfo") {
+              setCurrentUser(taskData);
+            } // end if
+          } // end if
+          
+        } // next n
+        
         fnSuccess(dataPosted,returnedData);
         ajaxLogEntry.notes.push("success function called");
       } // end if
@@ -223,6 +241,10 @@ function pageSetup() {
   
   info1Nd.innerHTML = sHdrInfo;
   
+  const copyrightYear1Nd = $("#copyrightYear1")[0];
+  const dt = new Date();
+  copyrightYear1Nd.innerHTML = dt.getFullYear()+"";
+    
   if (sHdrInfo.indexOf("iPhone") > -1 || sHdrInfo.indexOf("iPad") > -1) {
     if (!window.navigator.standalone === true) {
       bIsStandalone = false;
@@ -234,6 +256,10 @@ function pageSetup() {
     } // end if
   } // end if  
   
+  if (sHdrInfo.toLowerCase().indexOf("mobile") > -1) {
+    app.mobileDevice = true;
+    app.desktopDevice = false;
+  } // end if
   
   pageResize();
   
@@ -288,14 +314,21 @@ function pageResize() {
   h = window.innerHeight;
   
   resizePanel(splashNd);
+  resizePanel(registerDevicePanelNd);
   
   menuNd.style.height = (h-90)+"px";
   pageContentNd.style.height = menuNd.style.height;
   pageContentNd.style.width = (w)+"px";
   
+  const titleBarNd = $("#titleBar")[0];
+  titleBarNd.style.width = (w)+"px";
+  
   const installToHomeScreenInitPromptNd = $("#installToHomeScreenInitPrompt")[0];
-  installToHomeScreenInitPromptNd.style.top = (h-45)+"px";
+  installToHomeScreenInitPromptNd.style.top = (h-43)+"px";
   installToHomeScreenInitPromptNd.style.width = (w-45)+"px";
+  
+  tintNd.style.width = (w)+"px";
+  tintNd.style.height = (h)+"px";
 } // end of function pageResize()
 
 
@@ -313,6 +346,8 @@ function resizePanel(pnl) {
   
   pnl.style.background = "lightyellow";
   pnl.style.border = "solid blue 5px"
+  
+  
 } // end of function resizePanel()
 
 
@@ -334,52 +369,80 @@ function buildMenu() {
   
   splashNd.style.display = "none";
   
+  if (hasPermission("mom")) {
+    sPerson = "My";
+  } // end if
+  
   s.push("<li class='mnuItm'>");
   s.push("<button class='mnuBtn' onclick='viewAppts()'>"+sPerson+" Appointments</button>");
   s.push("</li>");
+  
   
   /* s.push("<li class='mnuItm'>");
   s.push("<button class='mnuBtn' onclick='viewOldAppts()'>"+sPerson2+" Old Appointments</button>");
   s.push("</li>");
   */
   
-  s.push("<li class='mnuItm'>");
-  s.push("<button class='mnuBtn' onclick='editAppts()'>Edit Appointments</button>");
-  s.push("</li>");
-  
+  if (hasPermission("admin")) {
+    s.push("<li class='mnuItm'>");
+    s.push("<button class='mnuBtn' onclick='editAppts()'>Edit Appointments</button>");
+    s.push("</li>");
+  } // end if
+
+  if (hasPermission("admin")) {
   s.push("<li class='mnuItm'>");
   s.push("<button class='mnuBtn' onclick='editApptDates()'>Edit Appointment Dates</button>");
   s.push("</li>");
+  } // end if
   
+  if (hasPermission("admin")) {
   s.push("<li class='mnuItm'>");
   s.push("<button class='mnuBtn' onclick='editShoppingListItems()'>Edit Shopping List Items</button>");
   s.push("</li>");
+  } // end if
   
+  if (hasPermission("admin")) {
   s.push("<li class='mnuItm'>");
   s.push("<button class='mnuBtn' onclick='editStoreNames()'>Edit Store Names</button>");
   s.push("</li>");
+  } // end if
+  
+  if (hasPermission("admin,mom,wife")) {
+    s.push("<li class='mnuItm'>");
+    s.push("<button class='mnuBtn' onclick='editShoppingList()'>"+sPerson+" Shopping List</button>");
+    s.push("</li>");
+  } // end if
+  
+  if (hasPermission("admin")) {
+    s.push("<li class='mnuItm'>");
+    s.push("<button class='mnuBtn' onclick='editLocStatuses()'>Edit Location Statuses</button>");
+    s.push("</li>");
+  } // end if
+  
+  if (hasPermission("admin,wife,sister,mom")) {
+    s.push("<li class='mnuItm'>");
+    s.push("<button class='mnuBtn' onclick='whereAre()'>Where Are...</button>");
+    s.push("</li>");
+  }
   
   
-  s.push("<li class='mnuItm'>");
-  s.push("<button class='mnuBtn' onclick='editShoppingList()'>Shopping List</button>");
-  s.push("</li>");
+  if (hasPermission("admin,wife,sister")) {
+    s.push("<li class='mnuItm'>");
+    s.push("<button class='mnuBtn' onclick='pickLocStatus()'>Set Location Status</button>");
+    s.push("</li>");
+  }
   
+  if (hasPermission("admin")) {
+    s.push("<li class='mnuItm'>");
+    s.push("<button class='mnuBtn' onclick='editUsers()'>Edit Users</button>");
+    s.push("</li>");
+  } // end if
   
-  s.push("<li class='mnuItm'>");
-  s.push("<button class='mnuBtn' onclick='editLocStatuses()'>Edit Location Statuses</button>");
-  s.push("</li>");
-  
-  s.push("<li class='mnuItm'>");
-  s.push("<button class='mnuBtn' onclick='pickLocStatus()'>Set Location Status</button>");
-  s.push("</li>");
-  
-  s.push("<li class='mnuItm'>");
-  s.push("<button class='mnuBtn' onclick='editUsers()'>Edit Users</button>");
-  s.push("</li>");
-  
-  s.push("<li class='mnuItm'>");
-  s.push("<button class='mnuBtn' onclick='editWeeklyReminders()'>Edit Weekly Reminders</button>");
-  s.push("</li>");
+  if (hasPermission("admin")) {
+    s.push("<li class='mnuItm'>");
+    s.push("<button class='mnuBtn' onclick='editWeeklyReminders()'>Edit Weekly Reminders</button>");
+    s.push("</li>");
+  } // end if
   
   menuListNd.innerHTML = s.join("");
   menuNd.style.display = "block";
@@ -390,6 +453,29 @@ function buildMenu() {
   } // next n
   
 } // end of function buildMenu()
+
+
+
+/*************************************************************************
+ *************************************************************************/
+function editApptDates() {
+  console.log("editApptDates() function called");
+  menuNd.style.display = "none";
+  
+  buildBasicListUi({forTable:"appointmentDates",containerDomEl:pageContentNd,addButton:true});
+} // end of function editApptDates()
+
+
+
+
+/*************************************************************************
+ *************************************************************************/
+function editAppts() {
+  console.log("editAppts() function called");
+  menuNd.style.display = "none";
+  
+  buildBasicListUi({forTable:"appointments",containerDomEl:pageContentNd,addButton:true});
+} // end of function editAppts()
 
 
 
@@ -463,7 +549,7 @@ function getFutureAppointments(appState) {
  *************************************************************************/
 function getFutureAppointmentsSuccess(dataPosted, dataReturned) {
   console.log("getFutureAppointmentsSuccess() function called");
-  //debugger;
+
   
   if (dataPosted.appState === "start") {
     buildMenu();
@@ -476,6 +562,7 @@ function getFutureAppointmentsSuccess(dataPosted, dataReturned) {
 
 
 /*************************************************************************
+
  *************************************************************************/
 function getFutureAppointmentsFailure(dataPosted, dataReturned) {
   console.log("getFutureAppointmentsFailure() function called");
@@ -484,6 +571,38 @@ function getFutureAppointmentsFailure(dataPosted, dataReturned) {
 } // end of function getFutureAppointmentsFailure()
 
 
+
+/*************************************************************************
+
+ *************************************************************************/
+function hasPermission(sPerms) {
+  
+  if (!app.currentUserInfo) {
+    return false; // don't have a current user? then they can't have permission!!
+  } // end if
+  
+  const currUser = app.currentUserInfo;
+  const userFunctionTagsByIndex = currUser.functionTags.split(",");
+  const checkPermsByIndex = sPerms.split(",");
+  const userFunctionTagsByPerm = [];
+  const nMax1 = userFunctionTagsByIndex.length;
+  for (let n=0;n<nMax1;n++) {
+    userFunctionTagsByPerm[userFunctionTagsByIndex[n]] = userFunctionTagsByIndex[n].toLowerCase();
+  } // next n
+  
+  
+  const nMax2 = checkPermsByIndex.length;
+  for (let n=0;n<nMax2;n++) {
+    const sCheck = checkPermsByIndex[n].toLowerCase();
+    
+    if (userFunctionTagsByPerm[sCheck]) {
+      // Found one!
+      return true;
+    } // end if 
+  } // next n
+  
+  return false;
+} // end of function hasPermission()
 
 
 /*************************************************************************
@@ -552,8 +671,13 @@ function registerDeviceSuccessful(postedData, returnedData) {
   localStorage.setItem("userEmailAdr",postedData.userEmailAdr);
   localStorage.setItem("pin",postedData.pin);
   localStorage.setItem("viewCmd","getFutureAppts");
+  
+  app.pin = postedData.pin;
+  app.userEmailAdr = postedData.userEmailAdr;
+  
   hideRegisterDevicePanel();
   hideSplashPanel();
+  buildMenu();
 } // end of function registerDeviceSuccessful()
 
 
@@ -621,6 +745,17 @@ function resetAppFailure(postedData, returnedData) {
 
 
 
+/*************************************************************************
+ *************************************************************************/
+function setCurrentUser(taskData) {
+  console.log("setCurrentUser() called")
+  const currUserObj = taskData.currentUserInfo;
+  app.currentUserInfo = currUserObj;
+  addRecDataToModel(currUserObj);  // right now, in ui.js
+} // end of function setCurrentUser()
+
+
+
 
 /*************************************************************************
  *************************************************************************/
@@ -634,7 +769,11 @@ function showDeviceRegistrationPanel() {
   appPinNd.value = "";
   regResultsNd.innerHTML = "";
   
+  splashNd.style.display = "none";
+  
   tintNd.style.display = "block";
+  registerDevicePanelNd.style.top = "50px";
+  registerDevicePanelNd.style.height = (h-100)+"px";
   registerDevicePanelNd.style.display = "block";
   
   regEmailAdrNd.focus();
@@ -660,6 +799,39 @@ function showInstallToHomeScreenPrompt() {
   installToHomeScreenInitPromptNd.style.display = "block";
 } // end of function showInstallToHomeScreenPrompt()
 
+
+
+
+
+
+
+
+
+/*************************************************************************
+mainly a hack
+ *************************************************************************/
+function titleBarClick() {
+  const titleBarNd = $("#titleBar")[0];
+  
+  titleBarNd.style.display = "none";
+} // end of function titleBarClick()
+
+
+
+
+
+/*************************************************************************
+ *************************************************************************/
+function toggleShowPwd(chkBx) {
+  const appPIN_Nd = $("#appPIN")[0];
+  
+  if (chkBx.checked) {
+    appPIN_Nd.type = "text";
+  } else {
+    appPIN_Nd.type = "password";
+  } // end if/else
+  
+} // end of function toggleShowPwd()
 
 
 
