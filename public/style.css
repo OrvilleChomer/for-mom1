@@ -20,6 +20,7 @@ body {
   padding:0;
   background-color:#00b8e6;
   overflow:hidden;
+  position: fixed;
 }
 
 .bold {
@@ -46,6 +47,96 @@ button:active {
 }
 
 
+.calBlock1 {
+  position:absolute;
+  border:solid silver .5px;
+  background:white;
+}
+
+.calBlock2 {
+  position:absolute;
+  border:solid silver .5px;
+  background:#f2f2f2;
+}
+
+.calBtn {
+  position:absolute;
+  height:35px;
+  top:6px;
+}
+
+.calCaption {
+  position:absolute;
+  left:20px;
+  top:20px;
+  width: 300px;
+  font-size:24pt;
+  color:#0066cc;
+}
+
+
+.calMonthName {
+  font-weight:bold;
+  font-size:24pt;
+}
+
+.calMonthYear {
+  position:absolute;
+  left:20px;
+  top:2px;
+  width: 300px;
+}
+
+
+.calOtherDays {
+  width:30px;
+  height:30px;
+  text-align:center;
+  line-height:30px;
+}
+
+#calPopup {
+  position:absolute;
+  display:none;
+  z-index:950;
+  background:white;
+  width:600px;
+  height:700px;
+  border:solid silver 3px;
+  border-radius:6px;
+}
+
+.calToday {
+  background:red;
+  width:30px;
+  height:30px;
+  border-radius:50%;
+  font-weight:bold;
+  color:white;
+  text-align:center;
+  line-height:30px;
+}
+
+.calWeekday {
+  position:absolute;
+  text-align:right;
+}
+
+
+/* allows to easily offset calendar itself Down
+   in the popup leaving room above it for 
+   information telling the user what they're selecting */
+.calWrapper {
+  position:absolute;
+  left:0px;
+  top:80px;
+}
+
+
+.calYear {
+  font-size:24pt;
+}
+
 #configProblemPanel {
   position:absolute;
   background:lightblue;
@@ -54,6 +145,37 @@ button:active {
   display:none;
 }
 
+
+.dateTime {
+  position:absolute;
+  left:0px;
+  top:0px;
+  width:120px;
+  border-radius:5px 0px 0px 5px;
+  margin-right:0px;
+}
+
+.dateTimeButton {
+  position:absolute;
+  left:120px;
+  top:0px;
+  width:120px;
+  border-radius:0px 5px 5px 0px;
+  margin-left:0px;
+  box-shadow:none;
+  width:30px;
+  font-weight:bold;
+  height:30px;
+  cursor:pointer;
+}
+
+
+.datetimeCtrlCtr {
+  position:relative;
+  left:0px;
+  top:0px;
+  height:32px;
+}
 
 .editTitle {
   position:absolute;
@@ -139,6 +261,7 @@ li {
 
 /* list header Formatting: */
 .lstHdr {
+  position:absolute;
   border:solid silver 1px;
   background:silver;
   color:black;
@@ -147,6 +270,7 @@ li {
 
 /* list header Col Formatting: */
 .lstHdrCol {
+  position:absolute;
   border:solid gray 1px;
   background:silver;
   color:black;
@@ -196,13 +320,19 @@ li {
   margin-bottom:12px;
 }
 
+/* format an input tag for number entry */
+.numberInput {
+  padding-right:0px;
+  text-align:right;
+  width:80px;
+}
 
 
 #pageContent {
   background-color: lightyellow;
   position:absolute;
   left:0;
-  top:40px;
+  top:46px;
   border:solid lightyellow 1px;
   overflow:hidden;
   display: none;
@@ -226,6 +356,9 @@ li {
   width:600px;
   height:400px;
   display:none;
+  padding:10px;
+  border-radius:5px;
+  z-index:1000;
 }
 
 
@@ -252,5 +385,33 @@ li {
   
 }
 
+#tint {
+  background:black;
+  opacity:.5;
+  position:absolute;
+  top:0px;
+  left:0px;
+  z-index:900;
+  display:none;
+}
 
 
+#titleBar {
+  position:absolute;
+  left:0px;
+  top:0px;
+  height:45px;
+  width:300px;
+  line-height:45px;
+  text-align:center;
+  font-size:20pt;
+  color:#ffe6ff; /*  ffe6ff */
+  text-shadow: -1px -1px #660066;
+  /* Permalink - use to edit and share this gradient: https://colorzilla.com/gradient-editor/#00b8e6+1,207cca+5,7db9e8+100 */
+  background: #7070db; /* Old browsers */
+  background: -moz-linear-gradient(top,  #00b8e6 1%,  #7070db 100%); /* FF3.6-15 */
+  background: -webkit-linear-gradient(top,  #00b8e6 1%,#7070db 100%); /* Chrome10-25,Safari5.1-6 */
+  background: linear-gradient(to bottom,  #00b8e6 1%,#7070db 100%); /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
+  filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#00b8e6', endColorstr='#7070db',GradientType=0 ); /* IE6-9 */
+  border-bottom:solid blue 1px;
+}
