@@ -141,8 +141,7 @@ app.post('/api', (request, response) => {
   
   console.log("/api called from client");
   
-  returnPayload.payloadStatus = "unknown"; // default until over-ridden
-  
+ 
   if (!cmd) {
     console.log("cmd property missing");
     let rData = {};
@@ -177,14 +176,20 @@ app.post('/api', (request, response) => {
   
   dbTaskProc.beginApiRequestTasksForCmd(cmd, response);
   
+  
+  if (dataInput.needCurrentUserInfo === true) {
+    console.log("need to grab current user info");
+    dbTaskProc.addTask(getCurrentUserInfoProc, "currentUserInfo");
+    // it will be up to another bit of cod to call:   dbTaskProc.performTasks(dataInput);   later!
+    
+  } // end if
+  
+  
   switch(cmd) {
     case "getHash":
       break;
     case "resetApp":
       resetApp(dataInput, returnPayload);
-      break;
-    case "getCurrentUserInfo":
-      getCurrentUserInfo(dataInput, returnPayload);
       break;
     case "registerDevice":
       deviceRegistered(dataInput, returnPayload);
@@ -322,18 +327,21 @@ function setupSchemaDefinition() {
   ],"Users", "User","user");
   
   appTableSchemaSetup("appointments",[
-  {field:"appointmentTitle",type:"text",size:60,caption:"Appointment",colWidth:300,listIndex:0,minLength:4},
+  {field:"appointmentTitle",type:"text",size:60,caption:"Appointment Name",colWidth:360,inputWidth:300,listIndex:0,minLength:4},
   {field:"descr",type:"memo",caption:"Details"},
-  {field:"readyToGo",type:"number",caption:"Ready To Go",defValue:1.25},
-  {field:"remindOrville",type:"number",caption:"Remind Orville",defValue:2},
-  {field:"comments",type:"text",size:80,caption:"Comments"},
-  {field:"important",type:"text",size:80,caption:"Important"},
-  {field:"seatCushion",type:"boolean",caption:"Bring Seat Cushion"}
+  {field:"readyToGo",type:"number",caption:"Ready To Go Before (in hours)",defValue:1.25},
+  {field:"approxInterval",type:"number",caption:"Approx Interval (in days)",defValue:30},
+  {field:"remindOrville",type:"number",caption:"Remind Orville Before (in hours)",defValue:2},
+  {field:"needCar",type:"boolean",caption:"Need Car for Appointment",mobileCaption:"Need Car"},
+  {field:"comments",type:"text",size:80,caption:"Appointment Comments",mobileCaption:"Comments",inputWidth:300},
+  {field:"important",type:"text",size:80,caption:"Important Info",mobileCaption:"Important",inputWidth:300},
+  {field:"seatCushion",type:"boolean",caption:"Bring Seat Cushion",mobileCaption:"Cushion"}
   ],"Appointments","Appointment","appointment");
   
   appTableSchemaSetup("appointmentDates",[
-  {field:"appointmentId",type:"fk",fkTable:"appointments"},
-  {field:"appointmentDate",type:"date",caption:"Appointment At"},
+  {field:"appointmentId",type:"fk",fkTable:"appointments",displayFields:["appointmentTitle"]},
+  {field:"prevAppointmentDateId",type:"id"},
+  {field:"appointmentDate",type:"datetime",caption:"Appointment At"},
   {field:"results",type:"memo"},
   {field:"comments",type:"entries",caption:"Comments"}
   ],"Appointment Dates","Appointment Date","appointmentDate");
@@ -346,16 +354,17 @@ function setupSchemaDefinition() {
   
   appTableSchemaSetup("weeklyReminders",[
   {field:"reminderText",type:"text",caption:"Weekly Reminder",listIndex:0,colWidth:400,inputWidth:300,minLength:2},
-  {field:"dayOfWeek",type:"weekday",caption:"Day of Week",listIndex:1}
+  {field:"dayOfWeek",type:"weekday",caption:"Day of Week",listIndex:1,colWidth:250}
   ],"Weekly Reminders","Weekly Reminder","weeklyReminder");
   
   appTableSchemaSetup("shoppingLists",[
-  {field:"lstTitle",type:"text",caption:"List Title",listIndex:0,minLength:6}
+  {field:"lstTitle",type:"text",caption:"List Title",listIndex:0,minLength:6},
+  {field:"shoppingListDate",type:"date"}
   ],"Shopping Lists","Shopping List","shoppingList");
   
   appTableSchemaSetup("listItems",[
   {field:"itemName",type:"text",caption:"Item Name",colWidth:400,inputWidth:300,listIndex:0,minLength:4},
-  {field:"uom",type:"text",caption:"UOM",size:15,colWidth:200,listIndex:0,minLength:2}
+  {field:"uom",type:"text",caption:"Unit of Measure",mobileCaption:"UOM",size:15,colWidth:200,listIndex:0,minLength:2}
   ],"List Items","List Item","listItem");
   
   appTableSchemaSetup("shoppingListItems",[
@@ -422,7 +431,7 @@ function deviceRegistered(dataInput) {
   console.log("deviceRegistered() called");
   
   
-  dbTaskProc.addTask(deviceRegistered2);
+  dbTaskProc.addTask(deviceRegistered2,"deviceRegistered");
   dbTaskProc.performTasks(dataInput);
   
   return;
@@ -510,27 +519,29 @@ function handleAdminUser() {
 
    called from "" command
  *************************************************************************/
-function getCurrentUserInfo(dataInput, returnPayload) {
-  console.log("getCurrentUserInfo() called");
+function getCurrentUserInfoProc(dataInput,doneTaskFunction, taskFailedFunction) {
+  console.log("getCurrentUserInfoProc() called");
   
+  let returnPayload = {};
   returnPayload.currentUserInfo = {};
-  returnPayload.returnContentList.push("currentUserInfo");
   
   db.find({ recordType: 'user',emailAdr: dataInput.userEmailAdr}, function (err, docs) {
     if (err) {
-      returnPayload.currentUserInfo.payloadStatus = "error";
+      returnPayload.payloadStatus = "error";
       returnPayload.errorOrigin = "server";
-      returnPayload.attemptedOperation = "db.find on user";
+      returnPayload.attemptedOperation = "db.find on user record type";
       returnPayload.jsFunctionName = "getCurrentUserInfo()";
+      taskFailedFunction(returnPayload);
       return;
     } // end if
     
     returnPayload.payloadStatus = "success";
-    returnPayload.data = docs;
-    
+    returnPayload.currentUserInfo = docs[0]; // return current user object
+    doneTaskFunction(returnPayload);
     return;
   }); // end of db.find()
-} // end of function getCurrentUserInfo(dataInput)
+  
+} // end of function getCurrentUserInfoProc(dataInput)
 
 
 /*************************************************************************
@@ -540,7 +551,7 @@ function getCurrentUserInfo(dataInput, returnPayload) {
 function getFutureAppts(dataInput) {
   console.log("getFutureAppts() called");
     
-  dbTaskProc.addTask(getFutureApptsProc);
+  dbTaskProc.addTask(getFutureApptsProc,"getFutureAppts");
   dbTaskProc.performTasks(dataInput);
     
 } // end of function getFutureAppts() 
@@ -582,7 +593,7 @@ function getFutureApptsProc(dataInput,doneTaskFunction, taskFailedFunction) {
 function getRecs(dataInput) {
   console.log("getRecs() called");
     
-  dbTaskProc.addTask(getRecsProc);
+  dbTaskProc.addTask(getRecsProc, "getRecs");
   dbTaskProc.performTasks(dataInput);
 } // end of function getRecs()
 
@@ -630,7 +641,7 @@ function getRecsProc(dataInput,doneTaskFunction, taskFailedFunction) {
 function getUsers(dataInput) {
   console.log("getUsers() called");
   
-  dbTaskProc.addTask(getUsersProc);
+  dbTaskProc.addTask(getUsersProc, "getUsers");
   dbTaskProc.performTasks(dataInput);
 } // end of function getUsers()
 
@@ -669,7 +680,7 @@ function getUsersProc(dataInput,doneTaskFunction, taskFailedFunction) {
  *************************************************************************/
 function resetApp(dataInput, returnPayload) {
   console.log("called resetApp() function");
-  dbTaskProc.addTask(resetAppProc);
+  dbTaskProc.addTask(resetAppProc, "resetApp");
   dbTaskProc.performTasks(dataInput);
 } // end of function resetApp()
 
@@ -716,7 +727,7 @@ function resetAppProc(dataInput,doneTaskFunction, taskFailedFunction) {
 function saveRec(dataInput) {
   console.log("saveRec() called");
   
-  dbTaskProc.addTask(saveRecProc);
+  dbTaskProc.addTask(saveRecProc, "saveRec");
   dbTaskProc.performTasks(dataInput);
 } // end of function saveRec(dataInput)
 
@@ -844,12 +855,12 @@ function DbTaskProcessor() {
   
   /*************************************************************************
   *************************************************************************/
-  taskPrc.addTask = function(taskFunction, doneTaskFunction, taskFailedFunction) {
+  taskPrc.addTask = function(taskFunction, sTaskTag) {
     console.log("taskPrc.addTask() method called");
     const dbTask = {};
     dbTask.taskFunction = taskFunction;
-    dbTask.doneTaskFunction = doneTaskFunction;
-    dbTask.taskFailedFunction = taskFailedFunction;
+    dbTask.taskTag = sTaskTag;
+    console.log(" --- taskTag added: "+sTaskTag);
     
     dbTask.taskAdded = new Date();
     
@@ -895,8 +906,8 @@ function DbTaskProcessor() {
       // ##############################################
       //  A TASK TO PROCESS... SO PROCESS IT!
       // ##############################################
-      console.log("popping a dbTask off the queue");
-      const dbTask = taskQueueByIndex.pop();
+      console.log("popping a dbTask off the Top of the queue (FIFO)");
+      const dbTask = taskQueueByIndex.shift();
       const taskFunction = dbTask.taskFunction;
       
       
@@ -908,13 +919,15 @@ function DbTaskProcessor() {
       evt.dbTask = dbTask;
       eventTriggered("beginTask", evt);
       
+      
+      
       // taskFunction() PARAMS:
       //  dataInput           - data from API client request (most likely)
       //  doneTask            - this is the function that is called when the task is done successfully
       //                        (declared below)
       //  taskFailed          - this is the function that is called if the task fails
       //                        (declared below)
-      taskFunction(dataInput,doneTask,taskFailed);      
+      taskFunction(dataInput, doneTask, taskFailed);      
       
     } else {
       // ##############################################
@@ -954,7 +967,8 @@ function DbTaskProcessor() {
     console.log("doneTask() function called");
     
     inpTaskResults.resultTimestamp = new Date();    
-
+    inpTaskResults.taskTag = lastDbTask.taskTag;
+    
     let evt = {};
     evt.dbTask = lastDbTask;
     eventTriggered("taskCompleted", evt);
@@ -968,12 +982,15 @@ function DbTaskProcessor() {
   
   
   /*************************************************************************
+  
   *************************************************************************/
   function taskFailed(inpTaskResults) {
     console.log("taskFailed() function called");
     
 
     bErrorsOccurred = true;    
+    inpTaskResults.taskTag = lastDbTask.taskTag;
+    
     // add to our return payload: any info about the failure
     returnPayload.push(inpTaskResults);
     
