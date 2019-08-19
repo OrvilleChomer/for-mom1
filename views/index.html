@@ -48,30 +48,51 @@
       MIT License
     </div><!-- splash -->
     
+    
+    <div id="titleBar" onclick="titleBarClick()">💕 For Mom 💕</div>
+    
     <div id="menu">
       <span>Hello <span id="userNameLabel">So-and-so</span>!</span>
       <ul id="menuList"></ul>
       <div id="appInfo"></div>
     </div><!-- menu -->
     
-    <div id="tint"></div>
+    
     <div id="configProblemPanel">
       The the application's <i>.env</i> file has not been set up correctly.
     </div>
     
     <div id="pageContent"></div>
     
+    <div id="tint"></div>
+    
+    <div id="calPopup"></div>
+    
     <div id="registerDevicePanel">
-      This application has not been registered on this device yet.
+      <h3>
+        Device Registration:
+      </h3>
+      <p>
+        This application has not been registered to work on this device yet.
+      </p>
       
       <p>Please enter in the follow information which was emailed/texted to you:</p>
       
       Email Address:
-      <input id="regEmailAdr" type="email" autocomplete="off">
+      <input id="regEmailAdr" type="email" autocomplete="off" size="30">
+      
+      
+       <!-- https://www.smashingmagazine.com/2018/08/ux-html5-mobile-form-part-2/ -->
       
       Application PIN:
-      <input id="appPIN" type="password" autocomplete="off">
-      
+      <input id="appPIN" type="password" autocomplete="off" autocapitalize="none" size="20">
+      <table cellpadding="0" cellspacing="0" border="0" width="200">
+        <tr valign="middle">
+          <td width="20" nowrap><input type="checkbox" id="showPwd" onchange="toggleShowPwd(this)"></td>
+          <td width="*" nowrap>&nbsp;show PIN</td>
+        </tr>
+      </table>
+      <hr><br>
       <button onclick="registerThisDevice()">
         Register this Device
       </button>
@@ -97,4 +118,3 @@
     <button id="refreshPage" onclick="refreshPage()">Refresh Page</button>
   </body>
 </html>
-
