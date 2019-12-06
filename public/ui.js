@@ -2,51 +2,119 @@
 let currDomEl;
 let currEditObj;
 let bUnsavedChanges = false;
-
+const dateSel = {};
+const dtCtrl = new DateTimeCtrl();
 
 
 
 
 /*************************************************************************
  
+ Called by:
+    - applyFormUiInputsSuccess()  from this file
 *************************************************************************/
 function addRecDataToModel(recData) {
   console.log("addRecDataToModel() function called");
   const appObj = app;
-  const tblSchema = appObj.schemaInfoByRecordType[recData.recordType];
-  const sTableName = tblSchema.tableName;
-  const sId = recData['_id'];
+  let sSpot = "";
+  let oldRecData; // just for reference if we need it for debugging
   
-  if (typeof appObj[sTableName+"ByIndex"] === "undefined") {
-    appObj[sTableName+"ByIndex"] = [];      
+  if (typeof recData === "undefined") {
+    alert("recData variable undefined!\nFile:  ui.js\nFunction:addRecDataToModel()");
+    debugger;
+    return false;
   } // end if
 
-  if (typeof appObj[sTableName+"ById"] === "undefined") {
-    appObj[sTableName+"ById"] = [];  // server's Id ["_id"]
-  } // end if
+  
+  let sRecType = "";
+  
+  try {
+    if (typeof recData.recordType !== "undefined") {
+      sRecType = recData.recordType;
+    } else {
+      if (typeof recData.savedRec !== "undefined") {
+        if (typeof recData.savedRec.recordType !== "undefined") {
+          sRecType = recData.savedRec.recordType;
+          oldRecData = recData;
+          recData = recData.savedRec; // move down into... (a real HACK (I know)!)
+        } // end if
+      } // end if
+    } // end if
 
-  const appRecsByIndex = appObj[sTableName+"ByIndex"];
-  const appRecsById = appObj[sTableName+"ById"];
-  
-  
-      
-  if (typeof recData[tblSchema.pkField] === "undefined") {
-    recData[tblSchema.pkField] = sId;
-  } // end if
-  
-  recData = fixUpRecObj(recData);
-  
-  // merge data in app data
-  if (typeof appRecsById[sId] === "undefined") {
-    // data not in app data yet... add it
-    appRecsByIndex.push(recData);
-  } // end if
+    if (sRecType==="") {
+      debugger;
+    } // end if
+    
+    const tblSchema = appObj.schemaInfoByRecordType[sRecType];
+    const sTableName = tblSchema.tableName;
+    const sId = recData['_id'];
 
-  appRecsById[sId] = recData;
+    if (typeof appObj[sTableName+"ByIndex"] === "undefined") {
+      appObj[sTableName+"ByIndex"] = [];      
+    } // end if
+
+    if (typeof appObj[sTableName+"ByServerId"] === "undefined") {
+      appObj[sTableName+"ByServerId"] = [];  // server's Id ["_id"]
+    } // end if
+
+    const appRecsByIndex = appObj[sTableName+"ByIndex"];
+    const appRecsById = appObj[sTableName+"ByServerId"];
+
+
+
+    if (typeof recData[tblSchema.pkField] === "undefined") {
+      recData[tblSchema.pkField] = sId;
+    } // end if
+
+    recData = fixUpRecObj(recData); // this function is in this JS file
+
+    // merge data in app data
+    if (typeof appRecsById[sId] === "undefined") {
+      // data not in app data yet... add it
+      recData.arrIdx = appRecsByIndex.length;
+      appRecsByIndex.push(recData);
+    } else {
+      if (typeof recData.arrIdx === "number") {
+        appRecsByIndex[recData.arrIdx] = recData; // replace previous object
+      } // end if
+    } // end if
+
+    appRecsById[sId] = recData; // add/replace by Id
+    return true;
+  } catch(err) {
+    let returnedData = {};
+    returnedData.result = "jsError";
+    returnedData.jsFunctionName = "addRecDataToModel()";
+    returnedData.errorOrigin = "client";
+    returnedData.message = err.message;
+    returnedData.fileName = err.fileName;
+    returnedData.lineNumber = err.line;
+    returnedData.spotInCode = sSpot;
+    
+    console.log(err);
+    
+    displayErrorInfo(returnedData);
+    return false;
+  } // end of try/catch
   
 } // end of function addRecDataToModel()
 
 
+
+
+/*************************************************************************
+ data returned from Ajax call is added to the client data model...
+*************************************************************************/
+function addReturnedDataToModel(data) {
+  console.log("addReturnedDataToModel() function called");
+  const nMax = data.length;
+  
+  for (let n=0;n<nMax;n++) {
+    const rowData = data[n];
+    addRecDataToModel(rowData); // this function is in this file 
+  } // next n
+  
+} // end of function addReturnedDataToModel()
 
 
 
@@ -70,7 +138,7 @@ function applyFormUiInputs(params) {
   for(n=0;n<nMax;n++) {
     fld = tblSchema.fields[n];
     
-    if (fld.type === "text" || fld.type === "number" || fld.type === "email" || fld.type === "weekday") {
+    if (fld.type === "text" || fld.type === "memo" || fld.type === "number" || fld.type === "email" || fld.type === "weekday" || fld.type === "datetime" || fld.type === "fk") {
     
       console.log("validating input field id: #frmItm"+fld.field);
       const inp = $("#frmItm"+fld.field)[0];
@@ -89,15 +157,37 @@ function applyFormUiInputs(params) {
           sMsgs.push("- "+sCaption+" contains an invalid value."); // 
           inp.style.background = "#ff6699";
         } else {
-          updatedObj[fld.field] = inp.value;
-
-          if (typeof fld.minLength === "number") {
+          
+          // handle if input is at least the minimum length:
+          // do before that is a possibility of updating updated object with value...
+          if (typeof fld.minLength === "number" && inp.value !== "") {
+            
             if (inp.value.length < fld.minLength) {
               inp.style.background = "#ff6699";
               sMsgs.push("- "+sCaption+" needs to be at least "+(fld.minLength)+" characters long.");
+              break;
             } // end if minLength value
+            
           } // end if minLength exists
 
+
+          
+          // note: a type of "fk" is an NeDb key value (which is a stringaddReturnedDataToModel)
+          if (fld.type === "text" || fld.type === "fk") {
+            updatedObj[fld.field] = inp.value;
+          } // end if
+          
+         if ((fld.type === "date" || fld.type === "datetime") && typeof inp.value === "string") {
+           // when a date or datetime field type, the type attribute for inp is "hidden"
+           if (inp.value !== "") {
+              updatedObj[fld.field] = new Date(inp.value); // make string value of date and time into an actual date object!
+           } // end if
+          } // end if
+                    
+          if (fld.type === "number") {          
+            updatedObj[fld.field] = inp.value - 0; // update property value casting to a numeric value
+          } // end if
+          
         } // end if (inp.reportValidity())  else ...
 
       } // end if input value different than current object value
@@ -161,6 +251,7 @@ function applyFormUiInputs(params) {
   } // end if
   
   apiCall("saveRec", iData, applyFormUiInputsSuccess, applyFormUiInputsFailure);
+  
 } // end of function applyFormUiInputs()
 
 
@@ -175,32 +266,55 @@ function applyFormUiInputs(params) {
 function applyFormUiInputsSuccess(dataPosted, dataReturned) {
   console.log("saveFormUiInputsSuccess() function called");
   const saveBtnNd = $("#saveBtn")[0];
+  let sSpot = "";
+  
   saveBtnNd.disabled = false;
   saveBtnNd.innerHTML = "Save Changes";
   
   const frmMsgsNd = $("#frmMsgs")[0];
   frmMsgsNd.innerHTML = "Changes Saved Successfully...";
   
- // currEditObj = dataReturned.returnPayload[0].savedRec;
-  currEditObj = dataReturned.returnPayloadByTagName["saveRec"];
-  
-  addRecDataToModel(currEditObj);
-  
-  bUnsavedChanges = false;
-  console.log(currEditObj);
-  
-  // is there a thenRun param???
-  if (typeof dataPosted.thenRun === "function") {
-    console.log("about to do a thenRun operation...");
-    let fn = dataPosted.thenRun;
+  try {
+     // currEditObj = dataReturned.returnPayload[0].savedRec;
+    sSpot = "trying to get object from: dataReturned.returnPayloadByTagName['saveRec']";
+    currEditObj = dataReturned.returnPayloadByTagName["saveRec"];
+    //debugger;
+    sSpot = "about to call:  addRecDataToModel(currEditObj)";
+    addRecDataToModel(currEditObj);
+    sSpot = "done calling: addRecDataToModel()";
+    bUnsavedChanges = false;
+    console.log(currEditObj);
+
+    // is there a thenRun param???
+    if (typeof dataPosted.thenRun === "function") {
+      console.log("about to do a thenRun operation...");
+      let fn = dataPosted.thenRun;
+
+      if (typeof dataPosted.runParams === "object") {
+        let params = dataPosted.runParams;
+        fn(params);
+      } else {
+        fn();
+      } // end if/else
+    } // end if
+    return true;
     
-    if (typeof dataPosted.runParams === "object") {
-      let params = dataPosted.runParams;
-      fn(params);
-    } else {
-      fn();
-    } // end if/else
-  } // end if
+  } catch(err) {
+    let returnedData = {};
+    returnedData.result = "jsError";
+    returnedData.jsFunctionName = "applyFormUiInputsSuccess()";
+    returnedData.errorOrigin = "client";
+    returnedData.message = err.message;
+    returnedData.fileName = err.fileName;
+    returnedData.lineNumber = err.lineNumber;
+    returnedData.spotInCode = sSpot;
+    
+    console.log(err);
+    
+    displayErrorInfo(returnedData);
+    return false;
+  } // end of try/catch()
+  
 } // end of function saveFormUiInputsSuccess() 
 
 
@@ -218,204 +332,19 @@ function applyFormUiInputsFailure(dataPosted, dataReturned) {
 } // end of function saveFormUiInputsFailure() 
 
 
-
-/*************************************************************************
-
-*************************************************************************/
-function buildCalendarCtlPopup(params) {
-  console.log("buildCalendarCtlPopup() function called");
-  let s=[];
-  let sCaption = "Select Date";
-  let pickDate = new Date();
-  let n,n2;
-  let nTop;
-  let nLeft;
-  const nPageWidth = w;
-  let nPopupOffset = Math.floor(nPageWidth * .05);
-  let nPopupWidth = nPageWidth - (nPopupOffset * 2);
-  let nPopupHeight = nPopupWidth + Math.floor(nPopupWidth * 2);
-  let nBlockSize = Math.floor(nPopupWidth / 7.5);
-  
-  let nYear = pickDate.getFullYear();
-  const todaysDate = new Date();
-  const Q = '"';
-  const calPopupNd = $("#calPopup")[0];
-  const firstDateInMonth = new Date();
-  firstDateInMonth.setDate(1);
-  firstDateInMonth.setMonth(pickDate.getMonth());
-  firstDateInMonth.setFullYear(pickDate.getFullYear());
-  const nStartWeekDay = firstDateInMonth.getDay();
-  const nTotDaysInMonth = getTotalDaysInMonth(pickDate);
-  
-  const sMonthName = getFullMonthName(pickDate);
-  
-  s.push("<div class='calCaption'>");
-  s.push(sCaption);
-  s.push(":</div>"); // calCaption
-  
-  
-  s.push("<div class='calWrapper'>");
-  
-  s.push("<div class='calMonthYear'>");
-  s.push("<span class='calMonthName'>"+sMonthName+"&nbsp;</span>");
-  s.push("<span class='calYear'>"+pickDate.getFullYear()+"</span>");
-  s.push("</div>"); // calMonthYear
-  
-  s.push("<button class='calBtn' ");    
-  s.push("title='previous month' ");
-  s.push("style="+Q);
-  s.push("left:"+(nPopupWidth - 135)+"px;");
-  s.push(Q);
-  s.push(">");
-  s.push("&lt;</button>");
-  
-  
-  s.push("<button class='calBtn' ");    
-  s.push("title='jump to today' ");
-  s.push("style="+Q);
-  s.push("left:"+(nPopupWidth - 105)+"px;");
-  s.push(Q);
-  s.push(">");
-  s.push("Today</button>");
-  
-  
-  // next month button
-  s.push("<button class='calBtn' ");    
-  s.push("title='next month' ");
-  s.push("style="+Q);
-  s.push("left:"+(nPopupWidth - 40)+"px;");
-  s.push(Q);
-  s.push(">");
-  s.push("&gt;</button>");
-
-    nTop = 50;
-    const sDays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    nLeft = 20;
-    for (n=0;n<7;n++) {
-      s.push("<div class='calWeekday' ");
-      s.push("style="+Q);
-      s.push("left:"+(nLeft)+"px;");
-      s.push("top:"+(nTop)+"px;");
-      s.push("width:"+(nBlockSize)+"px;");
-      s.push("height:"+(nBlockSize)+"px;");
-      
-      if (n===0 || n===6) {
-        s.push("color:gray;");
-      } // end if
-      
-      s.push(Q);
-      s.push(">");
-      s.push(sDays[n]);
-      s.push("&nbsp;</div>");
-      nLeft = nLeft + nBlockSize - 1;
-    } // next n
-  
-    let weekDate = 0;
-    nTop = 72;
-  
     
-    for (n=0;n<6;n++) {
-      
-      nLeft = 20;
-      for (n2=0;n2<7;n2++) {
-        let sClass = "calBlock1";
         
-        if (n2===0 || n2===6) {
-          sClass = "calBlock2";
-        } // end if
-        
-        s.push("<div class='"+sClass+"' ");
-        s.push("style="+Q);
-        s.push("left:"+(nLeft)+"px;");
-        s.push("top:"+(nTop)+"px;");
-        s.push("width:"+(nBlockSize)+"px;");
-        s.push("height:"+(nBlockSize)+"px;");
-        
-        s.push(Q);
-        s.push(">");
-        
-        if (weekDate===0) {
-          if (nStartWeekDay===n2) {
-            weekDate = weekDate + 1;
-          } // end if
-        } else {
-          weekDate = weekDate + 1;
-        } // end if/else
-        
-        if (weekDate>0 && weekDate <= nTotDaysInMonth) {
-          // display any info for actual date...
-          let bIsToday = false;
-          let testDate = new Date();
-          testDate.setFullYear(nYear);
-          testDate.setMonth(pickDate.getMonth());
-          testDate.setDate(weekDate);
-          
-          if (todaysDate.getDate() === testDate.getDate() &&
-              todaysDate.getMonth() === testDate.getMonth() &&
-              todaysDate.getFullYear() === testDate.getFullYear()) {
-              bIsToday = true;
-          } // end if
-          
-          s.push("<div ");
-          
-          if (bIsToday) {
-            s.push("class='calToday' ");
-          } else {
-            s.push("class='calOtherDays' ");
-          } // end if
-          
-          s.push("style="+Q);
-          s.push("position:absolute;");
-          s.push("right:6px;");
-          s.push("top:3px;");
-          
-          if (!bIsToday) {
-            if (n2===0 || n2===6) {
-              s.push("color:gray;");
-            } // end if
-          } // end if
-          
-          s.push(Q);
-          s.push(">");
-          s.push(""+(weekDate)); // a number from 1 to 31 !!!
-          s.push("</div>");
-        } // end if
-        
-        s.push("</div>"); // end of calBlock
-        nLeft = nLeft + nBlockSize - 1;
-      } // next n2 (day)
-      nTop = nTop + nBlockSize - 1;
-    } // next n (week)
-  
-    nTop = nTop + 10;
-    s.push("<button ");    
-    s.push("title='cancel' ");
-    s.push("onclick="+Q);
-    s.push("hideCalendarCtl()"+Q+" ");
-  
-    s.push("style="+Q);
-    s.push("position:absolute;");
-    s.push("left:15px;");
-    s.push("width:250px;");
-    s.push("top:"+(nTop)+"px;");
-    s.push(Q);
-    s.push(">");
-    s.push("Cancel Date Selection</button>");
-  
-  s.push("</div>"); // end of calWrapper
-  
-  calPopupNd.style.left = (nPopupOffset)+"px";
-  calPopupNd.style.top = (nPopupOffset)+"px";
-  calPopupNd.style.width = (nPopupWidth)+"px";
-  calPopupNd.style.height = (nPopupHeight)+"px";
-  calPopupNd.innerHTML = s.join("");
-  calPopupNd.style.display = "block";
-  tintNd.style.display = "block";
-} // end of function buildCalendarCtl
+
+
+
+
 
 
 /*************************************************************************
-
+  Builds HTML markup for user input form for doing 
+  maintenance on a data set's new or existing record,
+  and adds it to the DOM.
+  
 *************************************************************************/
 function buildFormUi(params) {
   let s=[];
@@ -427,8 +356,10 @@ function buildFormUi(params) {
   const appObj = app;
   const tblSchema = appObj.schemaInfoByTableName[sTableName];
   const nMax = tblSchema.fields.length;
-  const dataById = appObj[sTableName+"ById"];
+  const dataById = appObj[sTableName+"ByServerId"];
   bUnsavedChanges = false;
+  
+  gblDateCtrlInfoByIndex = []; // clear from any previous form builds
   
   if (typeof params.id === "string") {
     sId = params.id;
@@ -472,11 +403,18 @@ function buildFormUi(params) {
     let sCaption;
     
     // is this a kind of field editable in the UI?
-    if (fld.type === "text" || fld.type === "number" || 
+    if (fld.type === "text" || fld.type === "number" || fld.type === "fk" ||
         fld.type==="memo" || fld.type === "boolean" || fld.type === "datetime" || 
         fld.type === "email" || fld.type === "date" || fld.type==="weekday") {
       
-      s.push("<tr><td nowrap>");
+      s.push("<tr>");
+      s.push("<td nowrap ");
+      
+      if (app.mobileDevice) {
+        s.push("style='border-bottom:solid gray 1px;' ");
+      } // end if
+      
+      s.push(">");
       sCaption = fld.field;
       
       if (typeof fld.caption === "string") {
@@ -487,10 +425,13 @@ function buildFormUi(params) {
           sCaption = fld.mobileCaption;
         } // end if
       
-      s.push(sCaption+":</td>");
+      s.push(sCaption+":");
       
-      s.push("<td nowrap>");
-      
+      if (app.mobileDevice) {
+        s.push("<br>");
+      } else {
+        s.push("</td><td nowrap>");
+      } // end if
       
       // INPUT tag related UI:
       
@@ -566,24 +507,8 @@ function buildFormUi(params) {
       } // end if - memo
       
       if (fld.type==="datetime") {
-        s.push("<div>"); // control container wrapper - open
-          s.push("<div class='datetimeCtrlCtr'>"); // control container - open
-            s.push("<input ");
-            s.push("class='dateTime' readonly ");
-            s.push("id='frmItm"+fld.field+"' ");
-            s.push("style="+Q);
-
-            s.push(Q);
-            s.push(">");
-
-            s.push("<button ");
-            s.push("class='dateTimeButton' ");
-            s.push("onclick="+Q);
-            s.push("buildCalendarCtlPopup({'id':'frmItm"+fld.field+"'})");
-            s.push(Q);
-            s.push(">...</button>");
-          s.push("</div>"); // control container  - close
-        s.push("</div>"); // control container wrapper - close
+        const sDate = recData[fld.field]+""; // hopefully cast it as a string
+        s.push(dtCtrl.newCtrlMarkup({field:fld.field,pickDateCaption:"Pick Appointment Date",editTime:true,dateValue:sDate}));
       } // end if - datetime
       
       
@@ -602,6 +527,31 @@ function buildFormUi(params) {
           s.push("<option value='Saturday'>Saturday</option>");
         s.push("</select>");
       } // end if - weekday
+      
+      
+      if (fld.type==="fk") {
+        s.push("<select ");
+        s.push("id='frmItm"+fld.field+"' ");
+        s.push(">");
+        
+        s.push("<option value=''>** Pick **</option>");
+        
+        let sTableName = fld.fkTable;
+        let tblData = appObj[sTableName+"ByIndex"];
+        let nMax = tblData.length;
+        let sDisplayFieldName = fld.displayFields[0];  // for now...
+        
+        for (let n=0;n<nMax;n++) {
+          let rec = tblData[n];
+          s.push("<option value="+Q);
+          s.push(rec[fld.field]);
+          s.push(Q+">");
+          s.push(rec[sDisplayFieldName]);
+          s.push("</option>");
+        } // next n
+        
+        s.push("</select>");
+      } // end if - "fk"
       
       s.push("</td>");
       
@@ -661,7 +611,7 @@ function buildFormUi(params) {
   for (n=0;n<nMax;n++) {
     fld = tblSchema.fields[n];
     
-    if (fld.type === "text" || fld.type === "number" || fld.type === "email" || fld.type === "weekday" || fld.type === "memo") {
+    if (fld.type === "text"|| fld.type === "memo"  || fld.type === "number" || fld.type === "email" || fld.type === "weekday" || fld.type === "memo" || fld.type === "fk") {
       console.log("populating input field id: #frmItm"+fld.field);
       const inp = $("#frmItm"+fld.field)[0];
       inp.value = recData[fld.field];
@@ -686,13 +636,20 @@ function buildFormUi(params) {
     
   } // next n
   
+  
+  dtCtrl.activateControls();
 } // end of function buildFormUi()
 
 
 
 
 /*************************************************************************
-
+   buildBasicListUi() function.
+   
+                 Call Function             JS File
+                 ===============           =========
+   called by:    editApptDates()           app.js
+   
 *************************************************************************/
 function buildBasicListUi(params) {
   console.log("buildBasicListUi() function called");
@@ -711,11 +668,14 @@ function buildBasicListUi(params) {
   let nListTop = 0;
 
 
-  // build and display list box before query is done and list is populated
+  // build and display list box (starting empty) before query is done and list is populated
   s.push("<div "); // wrapping container (open)
   s.push("style='");
   s.push("position:relative;");
   s.push("overflow:hidden;");
+  s.push("background:orange;");
+  s.push("margin:0;");
+  s.push("padding:0;");
   s.push("left:0px;");
   s.push("top:0px;");
   s.push("width:"+(w)+"px;");
@@ -746,9 +706,7 @@ function buildBasicListUi(params) {
       // add item button:
       s.push("<button ");
       s.push("class='addBtn' ");
-      s.push("style='");
-      s.push("left:"+(w-48)+"px;");
-      s.push("' onclick="+Q);
+      s.push(" onclick="+Q);
       s.push("buildFormUi({");
       s.push("forTable:'"+sTableName+"'");
       s.push("})");
@@ -770,10 +728,11 @@ function buildBasicListUi(params) {
     h.push("style='");
     h.push("left:0px;");
     h.push("top:"+nListTop+"px;");
-    h.push("width:"+w+"px;");
-    h.push("height:26px;");    
+    h.push("width:"+w+"px;"); 
     h.push("'");
     h.push(">");
+    
+    
     for (n=0;n<nMax;n++) {
       fld = tblSchema.fields[n];
       if (typeof fld.listIndex === "number") {
@@ -801,6 +760,12 @@ function buildBasicListUi(params) {
         
         if (app.mobileDevice && typeof fld.mobileCaption === "string") {
           sCaption = fld.mobileCaption;
+        } // end if
+        
+        if (fld.displayFields) {
+          if (Array.isArray(fld.displayFields)) {
+            
+          } // end if
         } // end if
         
         h.push(sCaption); // col header text
@@ -850,6 +815,10 @@ function buildBasicListUi(params) {
   const spinnerNd = $("#spinner")[0];
   spinnerNd.src = spinnerImageNd.src;
   
+  /*
+  i want to change this so we can request data from one or more tables
+  i want to pass an array of table names
+   */
   const iData = {};
   iData.tableName = sTableName;
   let sCmd = "getRecs";
@@ -859,7 +828,8 @@ function buildBasicListUi(params) {
   } // end if
   
   iData.recordType = tblSchema.recordType;
-  
+  iData.queryRecordTypes = tblSchema.queryRecordTypes;  // Oct 8, 2019
+
   apiCall(sCmd, iData, buildBasicListUiDataLoaded, buildBasicListUiDataLoadFailure);
 } // end of function buildBasicListUi()
 
@@ -872,11 +842,18 @@ function buildBasicListUiDataLoaded(dataPosted, dataReturned) {
   console.log("buildBasicListUiDataLoaded() function called");
   const appObj = app;
   
+  
+
+
   try {
     const getRecsDataReturned = dataReturned.returnPayloadByTagName["getRecs"];
-    const data = getRecsDataReturned.data;
+    let data = getRecsDataReturned.data;
+    // addReturnedDataToModel() function is in this JS file
+    addReturnedDataToModel(data); // def a little sketchy... but for now...
+
     const s=[];
     const sTableName = dataPosted.tableName;
+    data = filterDataForTable(data,sTableName);
     const nMax = data.length;
     const tblSchema = appObj.schemaInfoByTableName[sTableName];
     const nMax2 = tblSchema.listFieldsByIndex.length;
@@ -889,9 +866,7 @@ function buildBasicListUiDataLoaded(dataPosted, dataReturned) {
     for (nRow=0;nRow<nMax;nRow++) {
       const rowData = data[nRow];
       const sId = rowData['_id'];
-      
-      addRecDataToModel(rowData);
-            
+           
       nLeft = 0;
       
       // ** Build a row in the list...
@@ -917,24 +892,54 @@ function buildBasicListUiDataLoaded(dataPosted, dataReturned) {
       for (n=0;n<nMax2;n++) {
         let nColWidth = 120;
         fld = tblSchema.listFieldsByIndex[n];
+        
         if (typeof fld.colWidth === "number") {
           nColWidth = fld.colWidth;
         } // end if
 
-        s.push("<div "); // field row cell opening tag
+        s.push("<div "); // field row cell opening tag 
         s.push("class='lstCell' ");
-        s.push("title="+Q);
-        s.push(rowData[fld.field]);
-        s.push(Q+" ");
+      
         s.push("style="+Q);
         s.push("top:0px;");
         s.push("left:"+(nLeft)+"px;");
         s.push("width:"+(nColWidth)+"px;");
+        
+        if (typeof fld.mobileListFontSize === "number" && appObj.mobileDevice===true) {
+          s.push("fontSize:"+(fld.mobileListFontSize)+"pt;");
+        } // end if
+        
         s.push(Q);
-        s.push(">&nbsp;");
-
+        let sFieldValue = "";
+        let sFieldType;
+        let bField = false;
+        let retValue;
+        
         if (typeof rowData[fld.field] !== "undefined") {
-          s.push(rowData[fld.field]);        
+          sFieldValue = rowData[fld.field];
+          sFieldType = fld.type;
+          bField = true;
+          
+          if (typeof fld.fkTable === "string") {
+            if (sFieldValue !== "") {
+              retValue = getFkFieldValueAndType(sFieldValue,fld);
+              sFieldValue = retValue.value;
+              sFieldType = retValue.type;
+            } // end if
+          } // end if
+          
+          
+          if (sFieldType === "datetime") {            
+            sFieldValue = formattedDateTime(sFieldValue);
+          } // end if
+          
+          s.push(" title="+Q+" "+sFieldValue+Q);
+        } // end if (is a field)
+        
+        s.push(">&nbsp;"); // closing char of opening DIV tag and a hard space
+
+        if (bField) {          
+            s.push(sFieldValue);           
         } // end if
 
         s.push("</div>"); // end of field row cell ... closing tag
@@ -967,6 +972,88 @@ function buildBasicListUiDataLoadFailure(dataPosted, dataReturned) {
   console.log("buildBasicListUiDataLoadFailure() function called");
   debugger;
 } // end of function buildBasicListUiDataLoadFailure()
+
+
+
+
+
+
+
+/*************************************************************************
+s.push("buildCalendarCtlPopup({'id':'frmItm"+fld.field+"'})");
+*************************************************************************/
+function calHome() {
+  let currentDate = new Date();
+  let nMonth = currentDate.getMonth();
+  let nYear = currentDate.getFullYear();
+  
+  
+  
+  let sId = dateSel.ctrlId;
+  let params = {};
+  params.id = sId;
+  params.navYear = nYear;
+  params.navMonth = nMonth;
+  buildCalendarCtlPopup(params);
+} // end of function calPrev
+
+
+
+/*************************************************************************
+s.push("buildCalendarCtlPopup({'id':'frmItm"+fld.field+"'})");
+*************************************************************************/
+function calNext() {
+  let nMonth = dateSel.currentMonth + 1;
+  let nYear = dateSel.currentYear;
+  
+  if (nMonth > 11) {
+    nMonth = 0;
+    nYear = nYear + 1;
+  } // end if
+  
+  let sId = dateSel.ctrlId;
+  let params = {};
+  params.id = sId;
+  params.navYear = nYear;
+  params.navMonth = nMonth;
+  buildCalendarCtlPopup(params);
+} // end of function calNext
+
+
+
+/*************************************************************************
+s.push("buildCalendarCtlPopup({'id':'frmItm"+fld.field+"'})");
+*************************************************************************/
+function calPrev() {
+  let nMonth = dateSel.currentMonth - 1;
+  let nYear = dateSel.currentYear;
+  
+  if (nMonth < 0) {
+    nMonth = 11;
+    nYear = nYear - 1;
+  } // end if
+  
+  let sId = dateSel.ctrlId;
+  let params = {};
+  params.id = sId;
+  params.navYear = nYear;
+  params.navMonth = nMonth;
+  buildCalendarCtlPopup(params);
+} // end of function calPrev
+
+
+
+
+
+/*************************************************************************
+
+*************************************************************************/
+function calSelDate(nMonth, nDay, nYear) {
+  
+  dateSel.valueControl.value = pickDate;
+} // end of function calSelDate()
+
+
 
 
 
@@ -1004,6 +1091,59 @@ function createNewRecObj(sTableName) {
 
 
 
+/*************************************************************************
+ display a dialog showing JS Error info...
+*************************************************************************/
+function displayErrorInfo(returnedData) {
+  const dia = document.createElement("div");  
+  const splashNd = document.getElementById("splash");
+  const s = [];
+  
+  // hide splash screen... in case it was blocking something
+  // when the error occurred!
+  splashNd.style.display = "none"; 
+  
+  dia.id="jsErrInfo";
+  dia.style.position = "absolute";
+  dia.style.width = "400px";
+  dia.style.height = "300px";
+  dia.style.background = "silver";
+  dia.style.zIndex = "910";
+  dia.style.overflow = "auto";
+  dia.style.left = ((w - 400) / 2) + "px";
+  dia.style.top = ((h - 300) / 2) + "px";
+  
+  s.push("<h2>Caught JS Error!</h2>");
+  
+  s.push("JS Function: "+returnedData.jsFunctionName+"<br>");
+  s.push("Error Origin: "+returnedData.errorOrigin+"<br>");
+  s.push("Error Message: "+returnedData.message+"<br>");
+  s.push("JS File Name: "+returnedData.fileName+"<br>");
+  s.push("Line#: "+returnedData.lineNumber+"<br>");
+  s.push("Spot in Code#: "+returnedData.spotInCode+"<br>");
+
+  s.push("<center>");
+  s.push("<button id='jsErrInfoCloseBtn'>Close</button>");
+  s.push("</center>");
+  
+  dia.innerHTML = s.join("");
+  document.body.appendChild(dia); 
+  tintNd.style.display = "block";
+  
+  const jsErrInfoCloseBtnNd = document.getElementById("jsErrInfoCloseBtn");
+  jsErrInfoCloseBtnNd.addEventListener("click", displayErrorInfoClose);
+} // end of function displayErrorInfo()
+
+
+/*************************************************************************
+ close dialog showing JS Error info...
+*************************************************************************/
+function displayErrorInfoClose() {
+  const jsErrInfoNd = document.getElementById("jsErrInfo");
+  jsErrInfoNd.style.display = "none";
+  tintNd.style.display = "none";
+  jsErrInfoNd.parentNode.removeChild(jsErrInfoNd);
+} // end of function displayErrorInfoClose()
 
 
 /*************************************************************************
@@ -1042,6 +1182,28 @@ function exitRecEdit(params1) {
 
 
 
+/*************************************************************************
+
+*************************************************************************/
+function filterDataForTable(idata,sTableName) {
+  const appObj = app;
+  const schema = appObj.schemaInfoByTableName[sTableName];
+  const sRecordType = schema.recordType
+  const data = [];
+  const nMax = idata.length;
+  
+  for (let i=0;i<nMax;i++) {
+    const recData = idata[i];
+    
+    if (recData.recordType === sRecordType) {
+      data.push(recData);
+    } // end if
+    
+  } // next i
+  
+  return data;
+  
+} // end of function filterDataForTable()
 
 
 
@@ -1075,13 +1237,133 @@ function fixUpRecObj(recObj) {
       } else {
         recObj[fld.field] = fld.defValue;
       } // end if/else
+    } else {
+      // field HAS a value.... make sure that it is the right type!
+      if (fld.type === "string" || fld.type === "comments" || fld.type === "boolean") {
+        recObj[fld.field] = recObj[fld.field] + "";
+      } // end if
+      
+      if (fld.type === "number") {
+        recObj[fld.field] = recObj[fld.field] - 0;
+      } // end if
+      
+      if ((fld.type === "date" || fld.type === "datetime" ) && typeof recObj[fld.field] === "string") {
+        recObj[fld.field] = new Date(recObj[fld.field]);
+      } // end if
+      
     } // end if
     
   } // next n
   
+  // handle implied fields that are not explicitely defined in the schema...
+  if (typeof recObj["createDate"] === "string") {
+    recObj["createDate"] = new Date(recObj["createDate"]);
+  } // end if
+  
+  if (typeof recObj["updateDate"] === "string") {
+    recObj["updateDate"] = new Date(recObj["updateDate"]);
+  } // end if
+  
   return recObj;
 } // end of function fixUpRecObj()
 
+
+
+/*************************************************************************
+
+*************************************************************************/
+function formattedDate(dt) {
+
+  let sMonth = (dt.getMonth()+1)+"";
+
+  if (sMonth.length ===1) {
+    sMonth = "0" + sMonth;
+  } // end if
+
+  let sDay = (dt.getDate())+"";
+
+  if (sDay.length ===1) {
+    sDay = "0" + sDay;
+  } // end if
+
+  let sDate = sMonth + "/" + sDay + "/"+dt.getFullYear();
+  return sDate;
+} // end of function formattedDate()
+
+
+
+   /****************************************************************************
+     
+    ****************************************************************************/      
+    function formattedDateTime(sDateValue) {
+      let sDate = "";
+      
+      if (sDateValue === "") {
+        return "";
+      } // end if
+      
+      const dt = new Date(sDateValue);
+      
+      sDate = formattedDate(dt);
+           
+      sDate = sDate + " @ " + formattedTime(dt);
+     
+      return sDate;
+    } // end of function formattedDateTime()
+
+
+
+
+  /****************************************************************************
+      Nicely formatted time (hours and minutes... no seconds)!
+
+    ****************************************************************************/     
+    function formattedTime(dt) {
+      let sAMPM = " AM";
+      let nHour = dt.getHours()+1;
+      
+      if (nHour > 12) {
+        nHour = nHour - 12;
+        sAMPM = " PM";
+      } // end if
+      
+      let sMinutes = dt.getMinutes()+"";
+      if (sMinutes.length ===1) {
+        sMinutes = "0" + sMinutes;
+      } // end if
+      
+      let sTime = (nHour)+":"+sMinutes+sAMPM;
+      
+      return sTime;
+    } // end of function formattedTime()
+
+
+
+
+/*************************************************************************
+
+*************************************************************************/
+function getFkFieldValueAndType(siFkValue,fld) {
+  const appObj = app;
+  const sTableName = fld.fkTable;
+  const schema = appObj.schemaInfoByTableName[sTableName];
+  const retValue = {};
+  const appRecsById = appObj[sTableName+"ByServerId"];
+  
+  const rec = appRecsById[siFkValue];
+  const displayFields = fld.displayFields;
+  const sFFieldName = displayFields[0];  // only doing 1 field for now
+  const fld2 = schema.fieldsByFieldName[sFFieldName];
+  
+  retValue.value = rec[sFFieldName];
+  retValue.type = fld2.type;
+  
+  return retValue;
+} // end of function  getFkFieldValueAndType()
+
+
+
+ 
 
 /*************************************************************************
 
@@ -1120,6 +1402,32 @@ function getTotalDaysInMonth(dt) {
 
 
 
+/*************************************************************************
+ for views other than the main menu (the Back button)
+*************************************************************************/
+function getViewTitleBarBackButtonMarkup(params) {
+  const s = [];
+  
+  
+  
+  return s.join("");
+} // end of function getViewTitleBarMarkup()
+
+
+/*************************************************************************
+ for views other than the main menu
+*************************************************************************/
+function getViewTitleBarMarkup(params) {
+  const s = [];
+  
+  s.push(getViewTitleBarBackButtonMarkup());
+  s.push(params.caption);
+  
+  return s.join("");
+} // end of function getViewTitleBarMarkup()
+
+
+
 
 /*************************************************************************
 
@@ -1147,6 +1455,7 @@ function saveFormUiInputs(params) {
   
   applyFormUiInputs(params);
 } // end of function saveFormUiInputs()
+
 
 
 
