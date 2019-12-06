@@ -28,13 +28,12 @@
     <!-- import the webpage's stylesheet -->
     <link rel="stylesheet" href="/style.css">
     
-    <!-- import the webpage's client-side javascript file -->
+    
     <script src="https://code.jquery.com/jquery-3.4.1.min.js"   
             integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="   
             crossorigin="anonymous"></script>
     
-    <script src="/ui.js" defer></script>
-    <script src="/app.js" defer></script>
+    
   </head>
   <body>
     <div style="display:none;">
@@ -49,10 +48,10 @@
     </div><!-- splash -->
     
     
-    <div id="titleBar" onclick="titleBarClick()">💕 For Mom 💕</div>
+    <div id="titleBar" onxclick="titleBarClick()">💕 For Mom 💕</div>
     
     <div id="menu">
-      <span>Hello <span id="userNameLabel">So-and-so</span>!</span>
+      <div class="greeting">Hello <span id="userNameLabel">So-and-so</span>!</div>
       <ul id="menuList"></ul>
       <div id="appInfo"></div>
     </div><!-- menu -->
@@ -116,5 +115,9 @@
     </div>
     
     <button id="refreshPage" onclick="refreshPage()">Refresh Page</button>
+    <script src="https://orvillechomer.github.io/dateTimeCtrl_OldSchool/dateTimeCtrl_plain.js?v=3"></script>
+    <script src="/ui.js" defer></script>
+    <script src="/app.js" defer></script>
   </body>
 </html>
+
