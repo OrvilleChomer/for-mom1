@@ -21,6 +21,10 @@
        - Removing Documents:    https://github.com/louischatriot/nedb#removing-documents
        - Indexing:              https://github.com/louischatriot/nedb#indexing
        
+       
+  JS Function of Interest in this file:
+  
+       getRecsProc()
  *************************************************************************/
 // init project
 const express = require('express');
@@ -35,8 +39,9 @@ let db;
 // but feel free to use whatever libs or frameworks you'd like through `package.json`.
 
 let appSchemaDataByIndex = [];
+let appSchemaDataByTableName = [];
 
-console.log('logging on the server side');
+console.log('*** logging on the server side');
 
 app.use(express.json({limit:'1mb'}));
 
@@ -133,6 +138,7 @@ if (sDbFileName) {
 
 /*************************************************************************
    Gonna use POST for Everything!
+   #api_endpoint 
  *************************************************************************/
 app.post('/api', (request, response) => {
   const dataInput = request.body;
@@ -198,10 +204,10 @@ app.post('/api', (request, response) => {
       getUsers(dataInput);
       break;
     case "getRecs":
-      getRecs(dataInput);
+      getRecs(dataInput);  // *** IMPORTANT
       break;
     case "saveRec":
-      saveRec(dataInput);
+      saveRec(dataInput);  // *** IMPORTANT
       break;
     case "newUserSetup":
       break;
@@ -314,9 +320,14 @@ app.get('/', function(request, response) {
 // listen for requests :)
 const listener = app.listen(process.env.PORT, function() {
   console.log('Your app is listening on port ' + listener.address().port);
-});
+}); // end of port listener block
 
 
+
+/*************************************************************************
+  only run when the Node server is restarted.
+  (make a small change to this file for that to happen!!)
+ *************************************************************************/
 function setupSchemaDefinition() {
   console.log("setupSchemaDefinition() function called");
   appTableSchemaSetup("users",[
@@ -330,6 +341,9 @@ function setupSchemaDefinition() {
   {field:"appointmentTitle",type:"text",size:60,caption:"Appointment Name",colWidth:360,inputWidth:300,listIndex:0,minLength:4},
   {field:"descr",type:"memo",caption:"Details"},
   {field:"readyToGo",type:"number",caption:"Ready To Go Before (in hours)",defValue:1.25},
+  {field:"atHome",type:"boolean",caption:"Appt is at Home"},
+  {field:"visitorName",type:"text",size:80,caption:"Visitor Name",mobileCaption:"Visitor",inputWidth:300},
+  {field:"visitRange",type:"number",caption:"Home Visit Range (in hours)",defValue:.5},
   {field:"approxInterval",type:"number",caption:"Approx Interval (in days)",defValue:30},
   {field:"remindOrville",type:"number",caption:"Remind Orville Before (in hours)",defValue:2},
   {field:"needCar",type:"boolean",caption:"Need Car for Appointment",mobileCaption:"Need Car"},
@@ -339,18 +353,19 @@ function setupSchemaDefinition() {
   ],"Appointments","Appointment","appointment");
   
   appTableSchemaSetup("appointmentDates",[
-  {field:"appointmentId",type:"fk",fkTable:"appointments",displayFields:["appointmentTitle"]},
+  {field:"appointmentId",type:"fk",caption:"Appointment With",colWidth:180,fkTable:"appointments",listIndex:0,displayFields:["appointmentTitle"]},
   {field:"prevAppointmentDateId",type:"id"},
-  {field:"appointmentDate",type:"datetime",caption:"Appointment At"},
+  {field:"appointmentDate",type:"datetime",caption:"Appointment At",colWidth:300,mobileListFontSize:12,
+          pickDateCaption:"Select the Date of the Appointment",listIndex:1,pickTimeCaption:"At Time"},
   {field:"results",type:"memo"},
   {field:"comments",type:"entries",caption:"Comments"}
   ],"Appointment Dates","Appointment Date","appointmentDate");
   
   appTableSchemaSetup("locStatuses",[
-  {field:"locStatusText",type:"text",caption:"Location Status Text",listIndex:0,minLength:6},
+  {field:"locStatusText",type:"text",caption:"Location Status Text",listIndex:0,minLength:6,colWidth:400,inputWidth:300},
   {field:"isGlobal",type:"boolean",caption:"Global"},
-  {field:"forUserId",type:"fk",fkTable:"users"}
-  ],"Location Statuses","Location Status");
+  {field:"forUserId",type:"fk",fkTable:"users",listIndex:1,caption:"For User",displayFields:["userName"]}
+  ],"Location Statuses","Location Status","locStatus");
   
   appTableSchemaSetup("weeklyReminders",[
   {field:"reminderText",type:"text",caption:"Weekly Reminder",listIndex:0,colWidth:400,inputWidth:300,minLength:2},
@@ -389,8 +404,47 @@ function setupSchemaDefinition() {
   //groceryReceipts
   
   //bankAccts
+  
+  // +++++++++++++++++++++++++++++++++++++
+  setupAdditionalRecTypes();
 } // end of function setupSchemaDefinition() 
 
+
+
+
+
+/*************************************************************************
+ ff
+ *************************************************************************/
+function setupAdditionalRecTypes() {
+  console.log(" ");
+  console.log("    *** setupAdditionalRecTypes() called");
+  const nMax1 = appSchemaDataByIndex.length;
+  
+  for (let n=0;n<nMax1;n++) {
+    const schema = appSchemaDataByIndex[n];
+    const nMax2 = schema.fields.length;
+    const sRecTypes = [];
+    
+    sRecTypes.push(schema.recordType);
+    
+    for (let n2=0;n2< nMax2;n2++) {
+      const fld = schema.fields[n2];
+
+      if (typeof fld.fkTable === "string") {
+        console.log("          --- found an fkTable property!");
+        const schema2 = appSchemaDataByTableName[fld.fkTable];
+        sRecTypes.push(schema2.recordType);
+      } // end if
+            
+    } // next n2
+    
+    schema.queryRecordTypes = sRecTypes.join(",");
+  } // next n
+  
+  console.log("    *** setupAdditionalRecTypes() completed");
+  console.log(" ");
+} // end of function setupAdditionalRecTypes() d
 
 
 
@@ -401,6 +455,8 @@ function setupSchemaDefinition() {
 function appTableSchemaSetup(sTableName, fields, sLabelPlural, sLabelSingular,sRecordType) {
   let schema = {};
   let sPk = sTableName;
+  
+  
   
   if (sPk.substr(sPk.length-1,1) === "s") {
     console.log("table name ends with 's'");
@@ -416,6 +472,7 @@ function appTableSchemaSetup(sTableName, fields, sLabelPlural, sLabelSingular,sR
   console.log("pk="+schema.pkField);
   
   appSchemaDataByIndex.push(schema);
+  appSchemaDataByTableName[sTableName] = schema;
   
   console.log(" --- added table schema: "+sTableName);
   
@@ -544,6 +601,9 @@ function getCurrentUserInfoProc(dataInput,doneTaskFunction, taskFailedFunction) 
 } // end of function getCurrentUserInfoProc(dataInput)
 
 
+
+
+
 /*************************************************************************
 
    called from "getFutureAppts" command
@@ -557,24 +617,38 @@ function getFutureAppts(dataInput) {
 } // end of function getFutureAppts() 
 
 
+
+
 /*************************************************************************
 
    called from "getFutureAppts" command
+   will return records with the record types of: 
+       "appointment", 
+       "appointmentDate"
+       
+   will think about adding to the query later to actually limit
+   it further to appointment date that are in the future.
+   
  *************************************************************************/
 function getFutureApptsProc(dataInput,doneTaskFunction, taskFailedFunction) {
+  console.log(" ");
+  console.log("============================");
   console.log("getFutureApptsProc() called");
   let returnPayload = {};
   
-  db.find({ recordType: 'appointment',apptDateMs: {$gt:0 }}, function (err, docs) {
+  // #future_appt_query1
+  db.find({ $or: [{recordType: 'appointment'},{recordType: 'appointmentDate'}]}, function (err, docs) {
+    console.log("  --- call-back returned from db.find()...");
     if (err) {
       returnPayload.payloadStatus = "error";
       returnPayload.errorOrigin = "server";
-      returnPayload.attemptedOperation = "db.find on appointment";
+      returnPayload.attemptedOperation = "db.find on appointment OR appointmentDate";
       returnPayload.jsFunctionName = "getFutureApptsProc()";
       taskFailedFunction(returnPayload);
       return;
     } // end if
     
+    console.log("  --- records returned: "+docs.length);
     returnPayload.payloadStatus = "success";
     returnPayload.data = docs;
     doneTaskFunction(returnPayload);
@@ -605,9 +679,22 @@ function getRecs(dataInput) {
 function getRecsProc(dataInput,doneTaskFunction, taskFailedFunction) {
   console.log("getRecsProc() called");
   let returnPayload = {};
+  let sRecordType;
+  let queryObj;
   
-  const sRecordType = dataInput.recordType;
-  let queryObj = {recordType:sRecordType}; // return all records for record type
+  if (typeof dataInput.queryRecordTypes === "string") {
+    const sRecordTypes = dataInput.queryRecordTypes.split(",");
+    sRecordType = dataInput.recordType;
+   // queryObj = {recordType:sRecordType}; // return all records for record type
+    queryObj = {$or:[]};
+    const nMax = sRecordTypes.length;
+    for (let n=0;n<nMax;n++) {
+      const qryParam = {recordType:sRecordTypes[n]}; 
+      queryObj["$or"].push(qryParam);
+    } // next n
+  } else {
+    
+  } // end if
   
   if (typeof dataInput.queryParams === "object") {
     // filter some more...
