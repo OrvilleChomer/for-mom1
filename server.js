@@ -35,12 +35,97 @@ const fs = require('fs');
 require('dotenv').config();
 let db;
 
+let myConsoleLogEntriesByIndex = [];
+const myConsole = {};
+
+
+/*************************************************************************
+ removes any HTML tags
+ *************************************************************************/
+function justText(sInput) {
+  let sOutput = "";
+  let bScanningTag = false;
+  let bEscapedChar = false;
+  const sBackSlash = "\\";
+  
+  const nMax = sInput.length;
+  for (let n=0;n<nMax;n++) {
+    const sChar = sInput.substr(n,1);
+    
+    if (!bScanningTag) {
+      if (!bEscapedChar) {
+        if (sChar === "<") {
+          bScanningTag = true;
+        } else {
+          sOutput = sOutput + sChar;
+        } // end if '<' / else
+      } else {
+        sOutput = sOutput + sChar;
+        
+        if (sChar === sBackSlash) {
+          bEscapedChar = true;
+        } else {
+          bEscapedChar = false;
+        } // end if / else
+        
+      } // end if !bEscapedChar / else
+      
+    } else {
+      if (sChar === ">") {
+        bScanningTag = false;
+      } // end if
+    } // end if !bScanningTag / else
+    
+  } // next n
+  
+  return sOutput;
+} // end of function justText()
+
+
+
+
+/*************************************************************************
+ 
+ DON'T USE  myConsole.log() Inside of this function or you will get 
+ a stack overflow for sure!!
+ *************************************************************************/
+myConsole.log = function(sMsg, params) {
+  if (typeof sMsg !== "string") return;
+  if (sMsg === "") return;
+  
+  let logEntry = {};
+  logEntry.recordType = "logEntry";
+  logEntry.timestamp = new Date();
+  logEntry.startTime = new Date();
+  logEntry.msg = sMsg;
+  logEntry.details = "";
+  logEntry.options = {};
+  logEntry.origin = "server";
+  logEntry.tagsByIndex = [];
+  logEntry.childTasksByIndex = [];
+  logEntry.parentTask = "na";
+  
+  logEntry.markComplete = function() {
+    let le = this;
+    le.endTime = new Date();
+  } // end of markComplete method
+  
+  const ts = "⏱["+formattedDateTime(logEntry.timestamp)+"] ";
+  console.log(ts+justText(sMsg));
+  
+  myConsoleLogEntriesByIndex.push(logEntry);
+  
+  return logEntry;
+} // end of log method
+
+
 // we've started you off with Express, 
 // but feel free to use whatever libs or frameworks you'd like through `package.json`.
 
 let appSchemaDataByIndex = [];
 let appSchemaDataByTableName = [];
 
+console.clear();
 console.log('*** logging on the server side');
 
 app.use(express.json({limit:'1mb'}));
@@ -51,12 +136,13 @@ setupSchemaDefinition();
 const sDbFileName = "./.data/"+process.env.dbFileName;
 
 if (sDbFileName) {
+  myConsole.log("checking to see if the neDb database file: <i>"+sDbFileName+"</i> exists...");
   let bExists1 = fs.existsSync(sDbFileName);
   
   if (bExists1) {
-    console.log("database file exists");
+    myConsole.log("neDb database file exists");
   } else {
-    console.log("database file does not exist");
+    myConsole.log("neDb database file does <i>not</i> exist");
   } // end if/else
   
 } // end if
@@ -96,9 +182,12 @@ function exitHandler(options, exitCode) {
 
 
 if (sDbFileName) {
-  db = new Datastore(sDbFileName); // (5:13)
-  db.loadDatabase(); // (5:40)
-  bDbOpen = true;
+  //db = new Datastore(sDbFileName); // (5:13)
+  db = new Datastore({ filename: sDbFileName, autoload: true });  // added:  Jan 12, 2020
+  myConsole.log("db object instantiated");
+  //db.loadDatabase(); // (5:40)
+  //myConsole.log(" - db.loadDatabase() method executed");
+  bDbOpen = true; //
   
   
   /*
@@ -145,11 +234,11 @@ app.post('/api', (request, response) => {
   const cmd = dataInput.cmd;
   let returnPayload = {};
   
-  console.log("/api called from client");
+  myConsole.log("<b>/api</b> called from client");
   
  
   if (!cmd) {
-    console.log("cmd property missing");
+    myConsole.log("cmd property missing");
     let rData = {};
     rData.result = "error";
     rData.info = "missing cmd value";
@@ -184,9 +273,9 @@ app.post('/api', (request, response) => {
   
   
   if (dataInput.needCurrentUserInfo === true) {
-    console.log("need to grab current user info");
-    dbTaskProc.addTask(getCurrentUserInfoProc, "currentUserInfo");
-    // it will be up to another bit of cod to call:   dbTaskProc.performTasks(dataInput);   later!
+    //myConsole.log("--- 🗃 need to grab current user info... adding task to get it");
+    //dbTaskProc.addTask(getCurrentUserInfoProc, "currentUserInfo");
+    // it will be up to another bit of code to call:   dbTaskProc.performTasks(dataInput);   Later!
     
   } // end if
   
@@ -199,6 +288,12 @@ app.post('/api', (request, response) => {
       break;
     case "registerDevice":
       deviceRegistered(dataInput, returnPayload);
+      break;
+    case "dump":
+      //dumpDb(response);   // comment out when done debugging!!
+      break;
+    case "deleteIds":
+      deleteRecsForIds(dataInput, response);  // comment out when done debugging!!
       break;
     case "getUsers":
       getUsers(dataInput);
@@ -217,40 +312,10 @@ app.post('/api', (request, response) => {
       break;
     case "pingUser":
       break;
-    case "getFutureAppts":
-      getFutureAppts(dataInput, returnPayload);
+    case "getLatestImportantInfo":
+      getLatestImportantInfo(dataInput, returnPayload);
       break;
     case "getPrevAppts":
-      break;
-    case "createAppt":
-      break;
-    case "updateAppt":
-      break;
-    case "delAppt":
-      break;
-    case "setNewApptDate":
-      break;
-    case "updateApptDate":
-      break;
-    case "updateApptResults":
-      break;
-    case "delApptDate":
-      break;
-    case "getLocStatuses":
-      break;
-    case "setLocStatus":
-      break;
-    case "addLocStatus":
-      break;
-    case "updateLocStatus":
-      break;
-    case "delLocStatus":
-      break;
-    case "createWeeklyReminder":
-      break;
-    case "updateWeeklyReminder":
-      break;
-    case "delWeeklyReminder":
       break;
     case "getCurrentShoppingList":
       break;
@@ -288,7 +353,7 @@ app.post('/api', (request, response) => {
   } // end of switch
  
   /*
-  responses from successful API calls are sent in internal performTask() function
+  responses from successful API calls are sent via internal performTask() function
   */
   
 }); // end of app.post('/api') block
@@ -299,11 +364,15 @@ function getBasicReturnObj() {
   
   obj.result = "???";
   obj.data = {};
-  obj
+  
   return obj;
 } // end of function
 
 
+
+/*
+  Write some
+  */
 /*let info = {};
 info.dbInfo = "testing nedb database";
 info.createDate = new Date();
@@ -319,7 +388,7 @@ app.get('/', function(request, response) {
 
 // listen for requests :)
 const listener = app.listen(process.env.PORT, function() {
-  console.log('Your app is listening on port ' + listener.address().port);
+  console.log('Your app is listening on port: ' + listener.address().port);
 }); // end of port listener block
 
 
@@ -329,16 +398,18 @@ const listener = app.listen(process.env.PORT, function() {
   (make a small change to this file for that to happen!!)
  *************************************************************************/
 function setupSchemaDefinition() {
-  console.log("setupSchemaDefinition() function called");
+  myConsole.log("<b>setupSchemaDefinition()</b> function called");
   appTableSchemaSetup("users",[
-  {field:"emailAdr",type:"email",caption:"Email Address",minLength:5},
+  {field:"emailAdr",type:"email",caption:"Email Address",minLength:5,sort:"asc"},
   {field:"userName",type:"text",size:50,caption:"User Name",listIndex:0,colWidth:300,minLength:2},
+  {field:"phone",type:"text",size:50,caption:"Phone Number"},
   {field:"functionTags",type:"text",size:80,caption:"Function Tag Values",inputWidth:300},
-  {field:"locStatusId",type:"fk",fkTable:"locStatuses"}
+  {field:"locStatusId",type:"fk",fkTable:"locStatuses",sys:true},
+  {field:"statusSetDate",type:"datetime",sys:true}
   ],"Users", "User","user");
   
   appTableSchemaSetup("appointments",[
-  {field:"appointmentTitle",type:"text",size:60,caption:"Appointment Name",colWidth:360,inputWidth:300,listIndex:0,minLength:4},
+  {field:"appointmentTitle",type:"text",size:60,caption:"Appointment Name",colWidth:360,inputWidth:300,listIndex:0,minLength:4,sort:"asc"},
   {field:"descr",type:"memo",caption:"Details"},
   {field:"readyToGo",type:"number",caption:"Ready To Go Before (in hours)",defValue:1.25},
   {field:"atHome",type:"boolean",caption:"Appt is at Home"},
@@ -362,9 +433,11 @@ function setupSchemaDefinition() {
   ],"Appointment Dates","Appointment Date","appointmentDate");
   
   appTableSchemaSetup("locStatuses",[
-  {field:"locStatusText",type:"text",caption:"Location Status Text",listIndex:0,minLength:6,colWidth:400,inputWidth:300},
+  {field:"locStatusText",type:"text",caption:"Location Status Text",listIndex:0,minLength:6,colWidth:400,inputWidth:300,sort:"asc"},
   {field:"isGlobal",type:"boolean",caption:"Global"},
-  {field:"forUserId",type:"fk",fkTable:"users",listIndex:1,caption:"For User",displayFields:["userName"]}
+  {field:"forUserId",type:"fk",fkTable:"users",fkField:"userId",listIndex:1,caption:"For User",displayFields:["userName"]},
+  {field:"minutesToCancel",type:"number",caption:"Cancel in (n) minutes",defValue:90},
+  {field:"extraInfo",type:"text",caption:"Extra Info",inputWidth:400}
   ],"Location Statuses","Location Status","locStatus");
   
   appTableSchemaSetup("weeklyReminders",[
@@ -378,8 +451,11 @@ function setupSchemaDefinition() {
   ],"Shopping Lists","Shopping List","shoppingList");
   
   appTableSchemaSetup("listItems",[
-  {field:"itemName",type:"text",caption:"Item Name",colWidth:400,inputWidth:300,listIndex:0,minLength:4},
-  {field:"uom",type:"text",caption:"Unit of Measure",mobileCaption:"UOM",size:15,colWidth:200,listIndex:0,minLength:2}
+  {field:"itemName",type:"text",caption:"Item Name",colWidth:400,inputWidth:300,listIndex:0,minLength:4,sort:"asc"},
+  {field:"uom",type:"text",caption:"Unit of Measure",mobileCaption:"UOM",size:15,colWidth:200,listIndex:0,minLength:2},
+  {field:"inRoom",type:"text",caption:"In Room",mobileCaption:"Room",size:15,minLength:2},
+  {field:"locInRoom",type:"text",caption:"Location In Room",mobileCaption:"Location",size:15,minLength:2},
+  {field:"locInRoom2",type:"text",caption:"Location In Room 2",mobileCaption:"Location",size:15}
   ],"List Items","List Item","listItem");
   
   appTableSchemaSetup("shoppingListItems",[
@@ -396,7 +472,7 @@ function setupSchemaDefinition() {
   ],"List Item Locations","List Item Location","listItemLocation");
   
   appTableSchemaSetup("stores",[
-  {field:"storeName",type:"text",caption:"Store Name",colWidth:400,inputWidth:300,listIndex:0,minLength:2}
+  {field:"storeName",type:"text",caption:"Store Name",colWidth:400,inputWidth:300,listIndex:0,minLength:2,sort:"asc"}
   ],"Stores","Store","store");
   
   //shoppingListItems
@@ -414,11 +490,53 @@ function setupSchemaDefinition() {
 
 
 /*************************************************************************
+  return Every object in the database regardless!
+  
+ *************************************************************************/
+function dumpDb(response) {
+  
+  return; // un-comment out when done debugging!!
+  
+  myConsole.log("<b>dumpDb()</b> called");
+  const rData = {};
+  
+  rData.originalCmd = "dump";
+  
+  myConsole.log("about to call: <b>db.find({})</b> ...");
+  db.find({ }, function (err, docs) {
+    myConsole.log("<b>db.find({})</b> ... called");
+    if (err) {
+      myConsole.log("<b>db.find({})</b> ... called ... oops! got an error!");
+      rData.result = "error";
+      rData.serverLogInfo = myConsoleLogEntriesByIndex;
+      response.json(rData);
+      myConsoleLogEntriesByIndex = []; // cleared out any previous data AFTER data sent!
+      return;
+    } // end if
+    
+    rData.returnPayload = docs;
+    rData.result = "ok";
+    rData.serverLogInfo = myConsoleLogEntriesByIndex;
+    
+    response.json(rData);
+    
+    // Clearing the array AFTER the data has been sent!!!
+    //                    -----
+    myConsoleLogEntriesByIndex = []; // cleared out any previous data
+    
+  }); // end of 'find' block
+} // end of function dumpDb()
+
+
+
+
+
+/*************************************************************************
  ff
  *************************************************************************/
 function setupAdditionalRecTypes() {
   console.log(" ");
-  console.log("    *** setupAdditionalRecTypes() called");
+  myConsole.log("<b>setupAdditionalRecTypes()</b> called");
   const nMax1 = appSchemaDataByIndex.length;
   
   for (let n=0;n<nMax1;n++) {
@@ -442,9 +560,9 @@ function setupAdditionalRecTypes() {
     schema.queryRecordTypes = sRecTypes.join(",");
   } // next n
   
-  console.log("    *** setupAdditionalRecTypes() completed");
+  myConsole.log("*** <b>setupAdditionalRecTypes()</b> completed");
   console.log(" ");
-} // end of function setupAdditionalRecTypes() d
+} // end of function setupAdditionalRecTypes() 
 
 
 
@@ -456,7 +574,7 @@ function appTableSchemaSetup(sTableName, fields, sLabelPlural, sLabelSingular,sR
   let schema = {};
   let sPk = sTableName;
   
-  
+  myConsole.log("Running <b>appTableSchemaSetup()</b> for the <b>"+sTableName+"</b> table");
   
   if (sPk.substr(sPk.length-1,1) === "s") {
     console.log("table name ends with 's'");
@@ -480,14 +598,52 @@ function appTableSchemaSetup(sTableName, fields, sLabelPlural, sLabelSingular,sR
 
 
 
+/*************************************************************************
+
+ *************************************************************************/
+function deleteRecsForIds(dataInput, response) {
+  
+   return;  // un-comment this line out after debugging is done!!!
+  myConsole.log("<b>deleteRecsForIds()</b> called");
+  
+  const rData = {};
+  rData.originalCmd = "deleteIds"
+  
+  const aIdsToDelete = dataInput.idsToDelete;
+  const query = {_id:{ $in:aIdsToDelete}};
+  db.remove(query, { multi: true }, function (err, numRemoved) {
+    if (err) {
+      myConsole.log("<b>db.remove({})</b> ... called ... oops! got an error!");
+      rData.result = "error";
+      rData.serverLogInfo = myConsoleLogEntriesByIndex;
+      response.json(rData);
+      myConsoleLogEntriesByIndex = []; // cleared out any previous data AFTER data sent!
+      return;
+    } // end if
+    
+    rData.result = "ok";
+    const returnInfo = {};
+    returnInfo.numToRemove = aIdsToDelete.length;
+    returnInfo.recsRemoved = numRemoved;
+    rData.returnPayload = returnInfo;
+    rData.serverLogInfo = myConsoleLogEntriesByIndex;
+    response.json(rData);
+    myConsoleLogEntriesByIndex = []; // cleared out any previous data AFTER sending
+    
+  }); // end of db.remove call-back
+  
+} // end of function deleteRecsForIds()
+
+
+
 
 /*************************************************************************
 
  *************************************************************************/
 function deviceRegistered(dataInput) {
-  console.log("deviceRegistered() called");
+  myConsole.log("<b>deviceRegistered()</b> called");
   
-  
+  //              function to perform,  tag
   dbTaskProc.addTask(deviceRegistered2,"deviceRegistered");
   dbTaskProc.performTasks(dataInput);
   
@@ -500,7 +656,7 @@ function deviceRegistered(dataInput) {
 
  *************************************************************************/
 function deviceRegistered2(dataInput,doneTaskFunction) {
-  console.log("deviceRegistered2() called");
+  myConsole.log("<b>deviceRegistered2()</b> called");
   
   let returnPayload = {};
  
@@ -512,6 +668,77 @@ function deviceRegistered2(dataInput,doneTaskFunction) {
 
 
 
+/*************************************************************************
+
+*************************************************************************/
+function formattedDate(dt) {
+
+  let sMonth = (dt.getMonth()+1)+"";
+
+  if (sMonth.length ===1) {
+    sMonth = "0" + sMonth;
+  } // end if
+
+  let sDay = (dt.getDate())+"";
+
+  if (sDay.length ===1) {
+    sDay = "0" + sDay;
+  } // end if
+
+  let sDate = sMonth + "/" + sDay + "/"+dt.getFullYear();
+  return sDate;
+} // end of function formattedDate()
+
+
+
+   /****************************************************************************
+     
+    ****************************************************************************/      
+    function formattedDateTime(sDateValue) {
+      let sDate = "";
+      
+      if (sDateValue === "") {
+        return "";
+      } // end if
+      
+      const dt = new Date(sDateValue);
+      
+      sDate = formattedDate(dt);
+           
+      sDate = sDate + " @ " + formattedTime(dt);
+     
+      return sDate;
+    } // end of function formattedDateTime()
+
+
+
+
+  /****************************************************************************
+      Nicely formatted time (hours and minutes... no seconds)!
+
+    ****************************************************************************/     
+    function formattedTime(dt) {
+      let sAMPM = " AM";
+      let nHour = dt.getHours()+1;
+      
+      if (nHour > 12) {
+        nHour = nHour - 12;
+        sAMPM = " PM";
+      } // end if
+      
+      let sMinutes = dt.getMinutes()+"";
+      if (sMinutes.length ===1) {
+        sMinutes = "0" + sMinutes;
+      } // end if
+      
+      let sTime = (nHour)+":"+sMinutes+sAMPM;
+      
+      return sTime;
+    } // end of function formattedTime()
+
+
+
+
 
 /*************************************************************************
   does not return a regular payload to client
@@ -520,7 +747,7 @@ function deviceRegistered2(dataInput,doneTaskFunction) {
   if there is Not one, it creates a new one and adds it to the db.
  *************************************************************************/
 function handleAdminUser() {
-  console.log("handleAdminUser() called");
+  myConsole.log("<b>handleAdminUser()</b> called");
   db.find({ recordType: 'user',emailAdr: defAdminEmailAdr}, function (err, docs) {
     if (err) {
       
@@ -528,7 +755,7 @@ function handleAdminUser() {
     
     if (docs.length ===0) {
       // no default admin user yet, so create one!
-      console.log("no default admin user found... creating one...");
+      myConsole.log("no default admin user found... creating one...");
       let adminUser = {};
       adminUser.recordType = "user";
       adminUser.emailAdr = defAdminEmailAdr; // value from .env file
@@ -539,15 +766,15 @@ function handleAdminUser() {
       // insert default admin user into db...
       db.insert(adminUser, function(err2, newDoc) {
         if (err2) {
-          
+          myConsole.log("error when trying to create an admin user.");
           return;
         } // end if
-        
+        myConsole.log("admin user created.");
       }); // end of db.insert call-back block
       
       
       // do mom user too!
-      console.log("and making a mom user !...");
+      myConsole.log("and making a mom user !...");
       let momUser = {};
       momUser.recordType = "user";
       momUser.emailAdr = defMomEmailAdr; // value from .env file
@@ -557,10 +784,11 @@ function handleAdminUser() {
       
       db.insert(momUser, function(err2, newDoc) {
         if (err2) {
-          
+          myConsole.log("error when trying to create a 'mom' user.");
           return;
         } // end if
         
+        myConsole.log("'mom' user created.");
       }); // end of db.insert call-back block
       
     } // end if
@@ -574,16 +802,37 @@ function handleAdminUser() {
 
 /*************************************************************************
 
-   called from "" command
+   called as a result of: dataInput.needCurrentUserInfo  being set to [true]!
+   
+   doneTaskFunction maps to the Actual function:  doneTask()
+   taskFailedFunction maps to the Actual function:  taskFailed()
  *************************************************************************/
 function getCurrentUserInfoProc(dataInput,doneTaskFunction, taskFailedFunction) {
-  console.log("getCurrentUserInfoProc() called");
+  myConsole.log("<b>getCurrentUserInfoProc()</b> called");
   
   let returnPayload = {};
   returnPayload.currentUserInfo = {};
   
+  
+  
+  if (typeof dataInput.userEmailAdr !== "string"){
+    myConsole.log(" --- Problem: dataInput.userEmailAdr should be a 'string'. Instead it is: '"+typeof dataInput.userEmailAdr+"'");
+  } else {
+    if (dataInput.userEmailAdr.indexOf("@") === -1){
+      myConsole.log(" --- Problem: dataInput.userEmailAdr is not a valid email address. Instead it is set to: '"+dataInput.userEmailAdr+"'");
+    } // end if
+  } // end if / else
+  
+  myConsole.log("about to do db.find()...");
   db.find({ recordType: 'user',emailAdr: dataInput.userEmailAdr}, function (err, docs) {
+    myConsole.log("current user Find query completed... Recs Returned: "+docs.length);
+    
     if (err) {
+      console.log(" ")
+      console.log("######")
+      console.log(err)
+      console.log("######")
+      myConsole.log("<b>db.find()</b> returned an error.");
       returnPayload.payloadStatus = "error";
       returnPayload.errorOrigin = "server";
       returnPayload.attemptedOperation = "db.find on user record type";
@@ -592,9 +841,24 @@ function getCurrentUserInfoProc(dataInput,doneTaskFunction, taskFailedFunction) 
       return;
     } // end if
     
-    returnPayload.payloadStatus = "success";
-    returnPayload.currentUserInfo = docs[0]; // return current user object
-    doneTaskFunction(returnPayload);
+    if (docs.length === 0) {
+      myConsole.log(" ❗❗❗ --- Problem: no records returned!");
+      myConsole.log("dataInput.userEmailAdr = '"+dataInput.userEmailAdr+"'");
+      returnPayload.payloadStatus = "error";
+      returnPayload.attemptedOperation = "db.find on user record type";
+      returnPayload.jsFunctionName = "getCurrentUserInfo()";
+      taskFailedFunction(returnPayload);
+      return;
+    } else {
+      console.log(docs.length+" user records were returned");
+      returnPayload.payloadStatus = "success";
+      returnPayload.currentUserInfo = docs[0]; // return current user object   
+      doneTaskFunction(returnPayload);
+      return;
+    } // end if / else
+    
+    
+    
     return;
   }); // end of db.find()
   
@@ -606,56 +870,63 @@ function getCurrentUserInfoProc(dataInput,doneTaskFunction, taskFailedFunction) 
 
 /*************************************************************************
 
-   called from "getFutureAppts" command
+   called from "getLatestImportantInfo" command
+   
+   Note that there could already be some Other tasks in the queue!
+   
  *************************************************************************/
-function getFutureAppts(dataInput) {
-  console.log("getFutureAppts() called");
+function getLatestImportantInfo(dataInput) {
+  myConsole.log("<b>getLatestImportantInfo(dataInput)</b> called");
     
-  dbTaskProc.addTask(getFutureApptsProc,"getFutureAppts");
+  dbTaskProc.addTask(expireOutdatedUserStatusesProc, "expireOutdatedUserStatusesProc"); // Jan 6, 2020  
+  dbTaskProc.addTask(getLatestImportantInfoProc,"getLatestImportantInfo");
   dbTaskProc.performTasks(dataInput);
     
-} // end of function getFutureAppts() 
+} // end of function getLatestImportantInfo() 
 
 
 
 
 /*************************************************************************
 
-   called from "getFutureAppts" command
+   called from "getLatestImportantInfo" command
    will return records with the record types of: 
        "appointment", 
-       "appointmentDate"
+       "appointmentDate",
+       "locStatus",
+       "user",
+       "weeklyReminder"
        
-   will think about adding to the query later to actually limit
-   it further to appointment date that are in the future.
+   will think about adding to the query later to Actually limit
+   it further to appointment dates that are in the future.
    
  *************************************************************************/
-function getFutureApptsProc(dataInput,doneTaskFunction, taskFailedFunction) {
+function getLatestImportantInfoProc(dataInput, doneTaskFunction, taskFailedFunction) {
   console.log(" ");
   console.log("============================");
-  console.log("getFutureApptsProc() called");
+  myConsole.log("<b>getLatestImportantInfoProc()</b> called");
   let returnPayload = {};
   
-  // #future_appt_query1
-  db.find({ $or: [{recordType: 'appointment'},{recordType: 'appointmentDate'}]}, function (err, docs) {
-    console.log("  --- call-back returned from db.find()...");
+  // #future_appt_query1    
+  db.find({ $or: [{recordType: 'appointment'},{recordType: 'appointmentDate'},{recordType: 'weeklyReminder'},{recordType: 'user'},{recordType: 'locStatus'}]}, function (err, docs) {
+    myConsole.log("  --- call-back returned from db.find()...");
     if (err) {
       returnPayload.payloadStatus = "error";
       returnPayload.errorOrigin = "server";
       returnPayload.attemptedOperation = "db.find on appointment OR appointmentDate";
-      returnPayload.jsFunctionName = "getFutureApptsProc()";
+      returnPayload.jsFunctionName = "getLatestImportantInfoProc()";
       taskFailedFunction(returnPayload);
       return;
     } // end if
     
-    console.log("  --- records returned: "+docs.length);
+    myConsole.log("  --- records returned: "+docs.length);
     returnPayload.payloadStatus = "success";
     returnPayload.data = docs;
-    doneTaskFunction(returnPayload);
+    doneTaskFunction(returnPayload);  // doneTaskFunction() is a function passed in as a parameter
     return;
   }); // end of db.find() call-back block
   
-} // end of function getFutureApptsProc() 
+} // end of function getLatestImportantInfoProc() 
 
 
 
@@ -665,7 +936,7 @@ function getFutureApptsProc(dataInput,doneTaskFunction, taskFailedFunction) {
  kick off getting records based on query and return them to the client...
  *************************************************************************/
 function getRecs(dataInput) {
-  console.log("getRecs() called");
+  myConsole.log("<b>getRecs()</b> called");
     
   dbTaskProc.addTask(getRecsProc, "getRecs");
   dbTaskProc.performTasks(dataInput);
@@ -677,7 +948,7 @@ function getRecs(dataInput) {
  get records based on query and return them to the client...
  *************************************************************************/
 function getRecsProc(dataInput,doneTaskFunction, taskFailedFunction) {
-  console.log("getRecsProc() called");
+  myConsole.log("<b>getRecsProc()</b> called");
   let returnPayload = {};
   let sRecordType;
   let queryObj;
@@ -701,8 +972,11 @@ function getRecsProc(dataInput,doneTaskFunction, taskFailedFunction) {
     console.log("--- filtering more...");
   } // end if
   
+  myConsole.log("about to do db.find()...");
   db.find(queryObj, function (err, docs) {
+    myConsole.log("db.find() completed");
     if (err) {
+      myConsole.log("db.find() returned an error.");
       returnPayload.payloadStatus = "error";
       returnPayload.errorOrigin = "server";
       returnPayload.attemptedOperation = "db.find for record type: "+sRecordType;
@@ -726,7 +1000,7 @@ function getRecsProc(dataInput,doneTaskFunction, taskFailedFunction) {
 
  *************************************************************************/
 function getUsers(dataInput) {
-  console.log("getUsers() called");
+  myConsole.log("<b>getUsers()</b> called");
   
   dbTaskProc.addTask(getUsersProc, "getUsers");
   dbTaskProc.performTasks(dataInput);
@@ -739,7 +1013,7 @@ function getUsers(dataInput) {
 
  *************************************************************************/
 function getUsersProc(dataInput,doneTaskFunction, taskFailedFunction) {
-  console.log("getUsersProc() called");
+  myConsole.log("<b>getUsersProc()</b> called");
   let returnPayload = {};
   
   db.find({ recordType: 'user'}, function (err, docs) {
@@ -760,13 +1034,176 @@ function getUsersProc(dataInput,doneTaskFunction, taskFailedFunction) {
 } // end of function getUsers()
 
 
+
+
+
+
+/*************************************************************************
+   expires outdated User Statuses 
+ *************************************************************************/
+function expireOutdatedUserStatusesProc(dataInput, doneTaskFunction, taskFailedFunction) {
+  myConsole.log("⭐⭐<b>expireOutdatedUserStatusesProc()</b>  called");
+  
+  let returnPayload = {};
+  const aLocStatusesById = [];
+  const aUsersByIndex = [];
+  const aIdsToReset = [];
+  let nResetCount = 0;
+  const now = new Date();
+  
+  // look for potential records to expire... as well as all the locStatus records...
+  myConsole.log("about to do a <b>db.find()</b>...");
+  db.find({ $or: [{ $and: [{recordType: 'user'},{locStatusId: {$ne:''}}]},{recordType: 'locStatus'}]}, function (err, recs) {
+    //            (recordType == 'user'   AND   locStatusId !== '')  OR  recordType = 'locStatus' 
+    myConsole.log("  --- call-back returned from <b>db.find()</b>...");
+    if (err) {
+      myConsole.log("<b>db.find()</b>. returned an error");
+      returnPayload.payloadStatus = "error";
+      returnPayload.errorOrigin = "server";
+      returnPayload.attemptedOperation = "";
+      returnPayload.jsFunctionName = "getUserStatusesProc()";
+      taskFailedFunction(returnPayload);
+      return;
+    } // end if
+    
+    const nMax1 = recs.length;
+    myConsole.log("  --- records returned: "+nMax1);
+    let nLocStatusCount = 0;
+    
+    // build our work data...
+    // build our locStatus lookup
+    for (let n=0;n<nMax1;n++) {
+      const rec = recs[n];
+      if (rec.recordType === "locStatus") {
+        aLocStatusesById[rec._id] = rec;
+        nLocStatusCount = nLocStatusCount + 1;
+      } // end if
+      
+      if (rec.recordType === "user") {
+        aUsersByIndex.push(rec);
+      } // end if
+    } // next n
+    
+    myConsole.log("✅✅--- Potential User Records returned that may need resetting: "+aUsersByIndex.length);
+    myConsole.log("✅✅--- Total User Location Status Records: "+nLocStatusCount);
+    console.log(" ");
+    console.log("=============================================");
+    const nMax2 = aUsersByIndex.length;
+    
+    myConsole.log("About to process through the "+nMax2+" user records...")
+    for (let n=0;n<nMax2;n++) {
+      const usrRec = aUsersByIndex[n];
+
+      const locStatRec = aLocStatusesById[usrRec.locStatusId];
+      
+      if (typeof locStatRec !== "undefined") {
+        const nExpiryMinutes = locStatRec.minutesToCancel;
+        const dt = new Date(usrRec.statusSetDate+"");
+        
+        myConsole.log("🌶🌶LOCATION STATUS RECORD FOUND!🌶🌶  key: "+usrRec.locStatusId)
+        myConsole.log("   nExpiryMinutes="+nExpiryMinutes);
+        myConsole.log("   dt="+dt);
+        myConsole.log("   now="+now);
+        if (nExpiryMinutes > 0) {
+          let nNumMinutesBetweenDates = numberOfMinutesBetweenDates(dt, now);
+          myConsole.log("   ⏰⏰ nNumMinutesBetweenDates="+nNumMinutesBetweenDates);
+          
+          if (nNumMinutesBetweenDates >= nExpiryMinutes) {
+            aIdsToReset.push(usrRec._id); // add to our list of ids needing resetting
+            myConsole.log("😬😬😬 found expired status for user id:<b>"+usrRec._id+"</b>")
+          } // end if
+        } // end if
+      } else {
+        // bad id so clear out to fix
+        myConsole.log("😜😜😜 found bad user location status id in user record...<b>"+usrRec._id+"</b> fixing...")
+        aIdsToReset.push(usrRec._id);
+      } // end if / else
+      
+    } // next n
+    
+    /*
+      https://github.com/louischatriot/nedb#updating-documents
+      
+      db.update(query, update, options, callback)
+      
+    */
+    myConsole.log("building neDb query...");
+    const query = {$and:[{_id:{ $in:aIdsToReset}},{recordType: 'user'}]};
+    myConsole.log("building neDb update instructions...");
+    const update = {locStatusId:"",statusSetDate:"",updateDate:now};
+    
+    /*
+    myConsole.log("about to perform <b>db.update()</b>...");
+    db.update(query, update, function (err2, numReplaced) {
+    myConsole.log("<b>db.update()</b> completed. Number of records updated: "+numReplaced);
+      if (err2) {
+        myConsole.log("<b>db.update()</b> operation returned an error");
+        returnPayload.payloadStatus = "error";
+        returnPayload.errorOrigin = "server";
+        returnPayload.attemptedOperation = "db.update - resetExpiredStatuses";
+        returnPayload.jsFunctionName = "getUserStatusesProc()";
+        taskFailedFunction(returnPayload);
+        return;
+      } // end if
+      
+      myConsole.log("<b>db.update()</b> operation was successful");
+      returnPayload.payloadStatus = "success";
+      returnPayload.operation = "resetExpiredStatuses";
+      returnPayload.rowsUpdated = numReplaced;
+      
+      doneTaskFunction(returnPayload);
+      return;
+    });// end of db.update call-back block
+    */
+    
+     // temp!! =====
+    returnPayload.payloadStatus = "success";
+    returnPayload.operation = "resetExpiredStatuses";
+    returnPayload.rowsUpdated = 0;
+    doneTaskFunction(returnPayload); // temp!!
+    return;
+    // temp!! =====
+    
+  }); // end of db.find() call-back block ... users
+  
+} // end of function expireOutdatedUserStatusesProc()
+
+
+
+/*************************************************************************
+  check if value passed in is a  Date or not...
+ *************************************************************************/
+function isDate(vInput) {
+  let bIsDate = false;
+  
+  if (Object.prototype.toString.call(vInput) === '[object Date]') {
+    bIsDate = true;
+  } // end if
+  
+  return bIsDate;
+} // end of function isDate()
+
+
+
+/*************************************************************************
+ *************************************************************************/
+function numberOfMinutesBetweenDates(date1, date2) {
+  const diffMs = (date1 - date2);
+  const diffMins = Math.round(((diffMs % 86400000) % 3600000) / 60000);
+  return Math.abs(diffMins);
+} // end of function numberOfMinutesBetweenDates();
+
+
+
+
+
 /*************************************************************************
 
    called from "resetApp" command
    used while testing
  *************************************************************************/
 function resetApp(dataInput, returnPayload) {
-  console.log("called resetApp() function");
+  myConsole.log("called <b>resetApp()</b> function");
   dbTaskProc.addTask(resetAppProc, "resetApp");
   dbTaskProc.performTasks(dataInput);
 } // end of function resetApp()
@@ -781,7 +1218,7 @@ function resetApp(dataInput, returnPayload) {
    used while testing
  *************************************************************************/
 function resetAppProc(dataInput,doneTaskFunction, taskFailedFunction) {
-  console.log("called resetAppProc() function");
+  console.log("called <b>resetAppProc()</b> function");
   
   let returnPayload = {};
   
@@ -794,10 +1231,13 @@ function resetAppProc(dataInput,doneTaskFunction, taskFailedFunction) {
   
   // delete database file
   fs.unlinkSync(sDbFileName);
+  myConsole.log("just deleted neDb database file.");
   
   // create a new database file to replace old one:
   db = new Datastore(sDbFileName); 
+  myConsole.log("just re-created neDb database file.");
   db.loadDatabase(); 
+  myConsole.log("just loaded the new neDb database file into memory.");
   
   
   handleAdminUser(); 
@@ -825,15 +1265,35 @@ function saveRec(dataInput) {
 
  *************************************************************************/
 function saveRecProc(dataInput,doneTaskFunction, taskFailedFunction) {
-  console.log("saveRecProc() called");
+  console.log("<b>saveRecProc()</b> called");
+  
+  
   const saveObj = dataInput.recData;
+  
+  
+  
   const returnPayload = {};
+  
+  
+  // Jan 15, 2020
+  if (typeof saveObj.recordType !== "string") {
+    returnPayload.payloadStatus = "error";
+    returnPayload.errorOrigin = "server";
+    returnPayload.jsFunctionName = "saveRecProc()";
+    returnPayload.errorInfo = "Invalid recordType";
+    taskFailedFunction(returnPayload);
+    return;
+  } // end if
+  
+  
   
   if (typeof saveObj["_id"] === "undefined") {
     // save new record:
     
     saveObj.createDate = new Date();
+    saveObj.createDateMs = saveObj.createDate.getTime();
     saveObj.updateDate = saveObj.createDate;
+    saveObj.updateDateMs = saveObj.updateDate.getTime();
     
     console.log("inserting new record");
     db.insert(saveObj, function(err2, newDoc) {
@@ -857,11 +1317,31 @@ function saveRecProc(dataInput,doneTaskFunction, taskFailedFunction) {
   } else {
     // update existing record:
     const sId = saveObj["_id"];
-    saveObj.updateDate = saveObj.createDate;
     
-    console.log("updating existing record with an id of: "+sId);
+    if (typeof saveObj.createDate === "string") {
+      if (isDate(saveObj.createDate)) {
+        saveObj.createDate = new Date(saveObj.createDate+""); // fix old rec that might need fixing
+      } else {
+        saveObj.createDate = new Date(); // fix old rec that might need fixing
+      } // end if / else
+    } // end if
+    
+    if (typeof saveObj.createDate === "undefined") {
+      saveObj.createDate = new Date(); // fix old rec that might need fixing
+    } // end if
+    
+    if (typeof saveObj.createDateMs === "undefined") {
+      saveObj.createDateMs = saveObj.createDate.getTime(); // fix old rec that might need fixing
+    } // end if
+    
+    saveObj.updateDate = new Date();
+    saveObj.updateDateMs = saveObj.updateDate.getTime();
+    
+    myConsole.log("updating existing record with an id of: "+sId);
     db.update({ '_id': sId }, saveObj, function (err2, numReplaced) {
+      myConsole.log("updating existing record with an id of: "+sId);
       if (err2) {
+        myConsole.log("updating operation returned an error.");
         returnPayload.payloadStatus = "error";
         returnPayload.errorOrigin = "server";
         returnPayload.attemptedOperation = "db.update ";
@@ -893,7 +1373,7 @@ function saveRecProc(dataInput,doneTaskFunction, taskFailedFunction) {
    const dbTaskProc = new DbTaskProcessor() 
  *************************************************************************/
 function DbTaskProcessor() {
-  console.log("called DbTaskProcessor() factory function");
+  myConsole.log("called <b>DbTaskProcessor()</b> factory function");
   const taskPrc = this;
   let taskQueueByIndex = [];
   let tasksCompletedByIndex = [];
@@ -943,7 +1423,7 @@ function DbTaskProcessor() {
   /*************************************************************************
   *************************************************************************/
   taskPrc.addTask = function(taskFunction, sTaskTag) {
-    console.log("taskPrc.addTask() method called");
+    myConsole.log("<b>taskPrc.addTask()</b> method called");
     const dbTask = {};
     dbTask.taskFunction = taskFunction;
     dbTask.taskTag = sTaskTag;
@@ -965,7 +1445,7 @@ function DbTaskProcessor() {
   /*************************************************************************
   *************************************************************************/
   taskPrc.performTasks = function(inpDataInput) {
-    console.log("taskPrc.performTasks() method called");
+    myConsole.log("<b>taskPrc.performTasks()</b> method called");
     dataInput = inpDataInput;
     returnPayload = [];
     
@@ -980,9 +1460,11 @@ function DbTaskProcessor() {
   
   
   /*************************************************************************
+  
+    
   *************************************************************************/
   function performTask() {
-    console.log("performTask() method called");
+    myConsole.log("<b>performTask()</b> method called");
     
     if (typeof lastDbTask === "object") {
       lastDbTask.endDate = new Date();
@@ -993,8 +1475,11 @@ function DbTaskProcessor() {
       // ##############################################
       //  A TASK TO PROCESS... SO PROCESS IT!
       // ##############################################
-      console.log("popping a dbTask off the Top of the queue (FIFO)");
+      myConsole.log("popping a <i>dbTask</i> off the Top of the queue (FIFO)");
       const dbTask = taskQueueByIndex.shift();
+      
+
+      myConsole.log("  -- 💬Task Tag: "+dbTask.taskTag);
       const taskFunction = dbTask.taskFunction;
       
       
@@ -1019,12 +1504,15 @@ function DbTaskProcessor() {
     } else {
       // ##############################################
       //  NO MORE TASKS, SO SEND BACK THE RESULTS!
+      
+      // DO NOT use the myConsole.log() method in this else block below!
+      
       // ##############################################
-      console.log("db task queue is empty");
+      myConsole.log("db task queue is empty");
       // No more tasks on the Queue, so send back to the client 
       // anything that needs sending back!
       if (response) {
-        console.log("about to send response back to the client");
+        myConsole.log("about to send a response back to the client");
         let rData = {};
         rData.result = "ok";
         rData.originalCmd = cmd;
@@ -1033,13 +1521,24 @@ function DbTaskProcessor() {
 
         // is client requesting schema info?
         if (dataInput.needSchemaInfo) {
-          console.log("returning schema info to client");
+          myConsole.log("returning schema info to the client");
           rData.schemaInfoByIndex = appSchemaDataByIndex;
         } // end if
 
+        // let client know about server's log entries
+        rData.serverLogInfo = myConsoleLogEntriesByIndex;
+        
         response.json(rData);
         console.log("response sent - all done processing db tasks and sending back any results");
         console.log("############################################################################################");
+        
+        // Clearing the array AFTER the data has been sent!!!
+        //                    -----
+        myConsoleLogEntriesByIndex = []; // cleared out any previous data
+        
+        // put in these two lines below so we could track it with these items Themselves being cleared!
+        myConsole.log("response data sent back to the client.");
+        myConsole.log("myConsoleLogEntriesByIndex[] cleared.")
       } // end if (response)
 
     } // end if
@@ -1051,7 +1550,7 @@ function DbTaskProcessor() {
   /*************************************************************************
   *************************************************************************/
   function doneTask(inpTaskResults) {
-    console.log("doneTask() function called");
+    myConsole.log("📌 doneTask() function called");
     
     inpTaskResults.resultTimestamp = new Date();    
     inpTaskResults.taskTag = lastDbTask.taskTag;
@@ -1072,7 +1571,7 @@ function DbTaskProcessor() {
   
   *************************************************************************/
   function taskFailed(inpTaskResults) {
-    console.log("taskFailed() function called");
+    myConsole.log("😭😭😭 🌶🌶🌶 <b>taskFailed()</b> function called 🌶🌶🌶");
     
 
     bErrorsOccurred = true;    
@@ -1101,7 +1600,7 @@ function DbTaskProcessor() {
   /*************************************************************************
   *************************************************************************/
   taskPrc.beginApiRequestTasksForCmd = function(sCmd, responseObj) {
-    console.log("taskPrc.beginApiRequestForCmd() method called");
+    myConsole.log("<b>taskPrc.beginApiRequestForCmd()</b> method called");
     
     let evt = {};
     evt.apiCmd = sCmd;
@@ -1117,7 +1616,7 @@ function DbTaskProcessor() {
   /*************************************************************************
   *************************************************************************/
   taskPrc.clearQueue = function(optParam) {
-    console.log("taskPrc.clearQueue() method called");
+    myConsole.log("<b>taskPrc.clearQueue()</b> method called");
     taskQueueByIndex = [];
     tasksCompletedByIndex = [];
     bATaskStarted = false;
