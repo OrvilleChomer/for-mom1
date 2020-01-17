@@ -1,6 +1,12 @@
 /* styles */
 /* called by your view template */
 
+/*
+  OFFICIAL_MOM_APP_FILE
+  
+  
+ */
+
 * {
   box-sizing: border-box;
 }
@@ -13,7 +19,7 @@
   height:45px;
   padding:0px;
   margin:0px;
-  right:25px;
+  right:5px;
   box-sizing: border-box;
   
 }
@@ -46,7 +52,7 @@ body {
   font-family: "Benton Sans", "Helvetica Neue", helvetica, arial, sans-serif;
   margin: 0px;
   padding:0px;
-  background-color:#9fa9a3;
+  background-color:#DD3B6A;
   overflow:hidden;
   position: fixed;
   box-sizing: border-box;
@@ -76,6 +82,39 @@ button:active {
 }
 
 
+.callMomBtn {
+  width:400px;
+  height:50px;
+  background:silver;
+  border:solid gray 1px;
+  border-radius:5px;
+  padding:0px;
+  overflow:hidden;
+}
+
+.callMomBtn2 {
+  width:400px;
+  height:50px;
+  position:relative;
+  left:0px;
+  top:5px;
+  text-decoration:none;
+  text-align:center;
+  text-height:20pt;
+  font-size:20pt;
+  padding:0px;
+  margin:0px;
+  overflow:hidden;
+}
+
+#callMomBtnImg {
+  position:absolute;
+  left:0px;
+  top:0px;
+  cursor:pointer;
+  padding:0px;
+  margin:0px'
+}
 
 .closeBtn {
   position:absolute;
@@ -131,6 +170,25 @@ button:active {
 .dayAway {font-size:16pt;color:blue;}
            	
 
+.dayOfTheWeek {
+  color:#0d4b4e;
+  background-color:#f8f9b2;
+  font-size:18pt;
+  padding:4px;
+  border-radius:5px;
+}
+
+
+.dialLink {
+  font-size:24pt;
+  color:#7070db;
+}
+
+.dialLink:hover {
+  background:lightblue;
+  
+}
+
 .editTitle {
   position:absolute;
   left:70px;
@@ -141,6 +199,14 @@ button:active {
   font-size:24pt;
 }
 
+.everyWeek {
+  font-size:16pt;
+}
+
+.everyWeek2 {
+  font-size:14pt;
+}
+
 
 .exitEditBtn {
   position:absolute;
@@ -149,6 +215,20 @@ button:active {
   width:45px;
   height:45px;
   padding:0px;
+}
+
+
+.flashMinute {
+  background:red;
+  border-radius:3px;
+  color:white;
+}
+
+
+.flashSecond {
+  background:yellow;
+  border-radius:3px;
+  color:blue;
 }
 
 
@@ -164,10 +244,14 @@ button:active {
 }
 
 
-h1 {
-  font-style: italic;
-  color: #373fff;
-  
+h1{
+  margin-top:0px;
+  margin-bottom:0px;
+}
+
+h3{
+  margin-top:0px;
+  margin-bottom:0px;
 }
 
 .hlt { background-color:#ffff66;font-size:18pt;padding-left:4px;border:solid #ffbb33 .25px;
@@ -190,9 +274,7 @@ h1 {
   border-bottom:solid gray 2px;
 }
 
-.homeIcon {
-  font-size:20pt;
-}
+
 
 .hoursAway {font-size:16pt;color:blue;}
 
@@ -202,6 +284,10 @@ h1 {
   left:0px;
   z-index:100;
   height:40px;
+}
+
+.icon {
+  font-size:26pt;
 }
 
 input {
@@ -220,6 +306,57 @@ li {
 li.apptDetails { position:relative; top:0px; left: 0px;}
            	
 
+.locStatusLst {
+  list-style-type:none;
+  padding:0px;
+  margin:0px;
+}
+
+.locStatusLstItm {
+  height:55px;
+  line-height:55px; /*  old value:  55px */
+  box-sizing: border-box;
+  border-bottom:solid gray .5px;
+  padding-left:6px;
+  cursor:pointer;
+}
+
+
+.locStatusLstItmSel {
+  height:55px;
+  line-height:55px; /*  old value:  55px */
+  box-sizing: border-box;
+  border-bottom:solid gray .5px;
+  padding-left:6px;
+  color:white;
+  background:gray;
+}
+
+
+#locStatSetBtns {
+  position:absolute;
+  left:8px;
+}
+
+.logPanelLst {
+  list-style-type:none;
+  padding:0px;
+  margin:0px;
+}
+
+.logPanelLstItm {
+  height:55px;
+  line-height:24px; /*  old value:  55px */
+  box-sizing: border-box;
+  border-bottom:solid gray .5px;
+  padding-left:6px;
+}
+
+#logEntryCloseBtn {
+  position:absolute;
+  left:5px;
+  bottom:4px;
+}
 
 #lstArea {
   position:absolute;
@@ -293,10 +430,10 @@ li.apptDetails { position:relative; top:0px; left: 0px;}
   position:absolute;
   left:0;
   top:45px;
-  border:solid #9fa9a3 1px;
+  border-bottom:solid black 2px;
   background: #9fa9a3;  /* fallback for old browsers */
-background: -webkit-linear-gradient(to bottom, #e3e0cc, #83a4d4);  /* Chrome 10-25, Safari 5.1-6 */
-background: linear-gradient(to bottom, #e3e0cc, #83a4d4); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+  background: -webkit-linear-gradient(to bottom, #e3e0cc, #83a4d4);  /* Chrome 10-25, Safari 5.1-6 */
+  background: linear-gradient(to bottom, #e3e0cc, #83a4d4); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
 
   overflow-x:hidden;
   overflow-y:scroll;
@@ -331,13 +468,19 @@ background: linear-gradient(to bottom, #e3e0cc, #83a4d4); /* W3C, IE 10+/ Edge, 
   width:80px;
 }
 
+#otherEmergencyOptions {
+  display:none;
+  z-index:9000;
+  top:80px;
+  position:absolute;
+}
 
 #pageContent {
-  background-color: lightyellow;
+  background-color: #e0e5ec; /*  Neumorphism background color */
   position:absolute;
   left:0;
   top:46px;
-  border:solid lightyellow 1px;
+  border:solid #e0e5ec 1px;
   /* overflow-x:hidden;
   overflow-y:auto; */
   display: none;
@@ -367,6 +510,18 @@ background: linear-gradient(to bottom, #e3e0cc, #83a4d4); /* W3C, IE 10+/ Edge, 
   z-index:1000;
 }
 
+/* panel to display reminders in */
+#reminderPanel {
+  position:absolute;
+  display:none; 
+  left:5px;
+  top:5px;
+  z-index:1000;
+  background:lightblue;
+  overflow:hidden;
+}
+
+
 
 .resetBtn {
   z-index:1000;
@@ -380,7 +535,49 @@ background: linear-gradient(to bottom, #e3e0cc, #83a4d4); /* W3C, IE 10+/ Edge, 
 }
 
 
+.rightNowTitle {
+  margin-left:20px;
+  font-size:20pt;
+  color:green;
+}
+
+
+#setLocStatusVwPrt {
+  position:absolute;
+  left:4px;
+  top:50px;
+  border:solid black 1px;
+  width:400px;
+  height:600px;
+  background:white;
+  overflow-x:hidden;
+  overflow-y:auto;
+  overflow-scrolling: touch !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+
+
+small {
+ /* font-size:7pt; */
+}
+
 span.apptDetails { position:absolute; top:0px; left: 100px;}
+
+
+.specialTask {
+  color:#d22a16;
+  background-color:#f8f9b2;
+  font-size:18pt;
+  font-weight:bold;
+  padding:4px;
+  border-radius:5px;
+}
+
+.specialTaskLst {
+  list-style-type:none;
+}
+
 
 #spinner {
   position:absolute;
@@ -393,6 +590,30 @@ span.apptDetails { position:absolute; top:0px; left: 100px;}
   background:green;
   z-index:100;
 }
+
+
+.textOutline {
+  text-shadow:
+		-1px -1px 0 #DD3B6A,
+		1px -1px 0 #DD3B6A,
+		-1px 1px 0 #DD3B6A,
+		1px 1px 0 #DD3B6A;
+}
+
+#timeDsp {
+  position:absolute;
+  left:8px;
+  height:40px;
+  background:black;
+  color:lightblue;
+  font-weight:bold;
+  text-align:center;
+  font-size:14pt;
+  line-height:40px;
+  overflow:hidden;
+  border-radius:6px;
+}
+
 
 #tint {
   background:black;
@@ -414,20 +635,108 @@ span.apptDetails { position:absolute; top:0px; left: 100px;}
   height:45px;
   width:300px;
   line-height:45px;
+  font-weight:bold;
   text-align:center;
-  font-size:20pt;
+  font-size:21pt;
   color:#ffe6ff; /*  ffe6ff */
-  text-shadow: -1px -1px #660066;
+  /* text-shadow: -1px -1px #660066; */
   background: #9fa9a3;  /* fallback for old browsers */
-background: -webkit-linear-gradient(to bottom, #9fa9a3, #c5d5c5);  /* Chrome 10-25, Safari 5.1-6 */
-background: linear-gradient(to bottom, #9fa9a3, #c5d5c5); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+  background: -webkit-linear-gradient(to bottom, #DD3B6A, #FFB6D9);  /* Chrome 10-25, Safari 5.1-6 */
+  background: linear-gradient(to bottom, #DD3B6A, #FFB6D9); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
 
 
-  border-bottom:solid #9fa9a3 1px;
+  border-bottom:solid #DD3B6A 2px;
   margin:0;
   padding:0;
   overflow:hidden;
 }
+
+/* notice pops up and then fades away! */
+#userNotice {
+  position:absolute;
+  border:solid black 4px;
+  border-radius:6px;
+  background:white;
+  color:black;
+  z-index:5000;
+  text-align:center;
+  line-height:100px;
+  font-size:20pt;
+  font-weight:bold;
+  overflow:hidden;
+  opacity:1;
+}
+
+
+.userStatusUserName {
+  font-size:15pt;
+}
+
+.userStatusUserStatus {
+  font-size:15pt;
+}
+
+.userStatusTable {
+  margin-left:60px;
+}
+
+@keyframes userNoticeDoFadeOut {
+  0% {
+    opacity: 1;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.userNoticeFadeOut{
+  animation-name: userNoticeDoFadeOut;
+  animation-duration: 4s;
+  animation-fill-mode: both;
+}
+
+
+
+
+#viewLogEntry {
+  position:absolute;
+  display:none;
+  background:white;
+  border:solid black 1px;
+  top:20px;
+  left:4px;
+  overflow-x:hidden;
+  overflow-y:auto;
+  overflow-scrolling: touch !important;
+  -webkit-overflow-scrolling: touch !important;  
+  z-index:4000;
+}
+
+#viewLogPanel {
+  position:absolute;
+  display:none;
+  background:silver:
+  overflow:none;
+  left:5px;
+  top:5px;  
+}
+
+#viewLogPanelLst {
+  position:absolute;
+  left:5px;
+  top:60px;
+  background:white;
+  border:solid gray 1px;
+  overflow-x:hidden;
+  overflow-y:scroll;
+  overflow-scrolling: touch !important;
+  -webkit-overflow-scrolling: touch !important;  
+}
+
+
 
 
 .viewTitleBar {
@@ -442,4 +751,3 @@ background: linear-gradient(to bottom, #9fa9a3, #c5d5c5); /* W3C, IE 10+/ Edge, 
   text-align:center;
   font-size:18pt;
 }
-
