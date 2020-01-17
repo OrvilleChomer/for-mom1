@@ -1,0 +1,15 @@
+{
+  "short_name": "For Mom",
+  "name": "For Mom",
+  "start_url": "/?pwa=y",
+  "background_color": "#3367D6",
+  "display": "fullscreen",
+  "theme_color": "#3367D6",
+  "icons":[
+    {
+      "src":"https://cdn.glitch.com/a2964a8f-6339-465f-8a8d-329fd8d12c43%2Ficon144x144.png?v=1577213272968",
+      "type":"image/png",
+      "sizes":"144x144"
+    }
+  ]
+}
