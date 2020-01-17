@@ -1,3 +1,8 @@
+/*
+  OFFICIAL_MOM_APP_FILE
+  
+  
+ */
 
 let currDomEl;
 let currEditObj;
@@ -11,15 +16,19 @@ const dtCtrl = new DateTimeCtrl();
 /*************************************************************************
  
  Called by:
+    - addReturnedDataToModel()
     - applyFormUiInputsSuccess()  from this file
 *************************************************************************/
 function addRecDataToModel(recData) {
-  console.log("addRecDataToModel() function called");
+  myConsole.log("<b>addRecDataToModel()</b> function called");
   const appObj = app;
   let sSpot = "";
   let oldRecData; // just for reference if we need it for debugging
+  const modelChanges = [];
   
   if (typeof recData === "undefined") {
+    // This block should Never, Ever run!!!
+    myConsole.log("recData variable undefined! File:  ui.js unction:addRecDataToModel()");
     alert("recData variable undefined!\nFile:  ui.js\nFunction:addRecDataToModel()");
     debugger;
     return false;
@@ -42,7 +51,9 @@ function addRecDataToModel(recData) {
     } // end if
 
     if (sRecType==="") {
+      const lg = myConsole.log(" -- Problem: record object's <i>record type</i> is Blank!");
       debugger;
+      return "error";
     } // end if
     
     const tblSchema = appObj.schemaInfoByRecordType[sRecType];
@@ -66,21 +77,50 @@ function addRecDataToModel(recData) {
       recData[tblSchema.pkField] = sId;
     } // end if
 
+    sSpot = "about to call fixUpRecObj()";
     recData = fixUpRecObj(recData); // this function is in this JS file
+    
+    if (recData === "error") {
+      return "error";
+    } // end if
+    
+    sSpot = "fixUpRecObj() call completed";
 
     // merge data in app data
     if (typeof appRecsById[sId] === "undefined") {
       // data not in app data yet... add it
       recData.arrIdx = appRecsByIndex.length;
       appRecsByIndex.push(recData);
+      let modelChange = {op:'add',id:sId,recType:sRecType};
+      modelChanges.push(modelChange);
     } else {
       if (typeof recData.arrIdx === "number") {
-        appRecsByIndex[recData.arrIdx] = recData; // replace previous object
+        const oldRec = appRecsByIndex[recData.arrIdx];
+        
+        // ==========================================================
+        for (let prop in recData) {
+          if (typeof oldRec[prop] === "undefined") {
+            let modelChange = {op:'change',id:sId, property:prop, newValue:recData[prop],recType:sRecType};
+            modelChanges.push(modelChange);
+            oldRec[prop] = recData[prop];
+          } else {
+            if (typeof oldRec[prop] !== recData[prop]) {
+              let modelChange = {op:'change',id:sId, property:prop, oldValue:oldRec[prop], newValue:recData[prop],recType:sRecType};
+              modelChanges.push(modelChange);
+              oldRec[prop] = recData[prop];
+            } // end if
+          } // end if
+          
+        } // next prop
+        // ==========================================================
+        
+        
+       // appRecsByIndex[recData.arrIdx] = recData; // replace previous object
       } // end if
     } // end if
 
     appRecsById[sId] = recData; // add/replace by Id
-    return true;
+    return modelChanges;
   } catch(err) {
     let returnedData = {};
     returnedData.result = "jsError";
@@ -108,11 +148,40 @@ function addRecDataToModel(recData) {
 function addReturnedDataToModel(data) {
   console.log("addReturnedDataToModel() function called");
   const nMax = data.length;
+  const modelChanges = [];
+  const modelChangesByRecType = [];
   
-  for (let n=0;n<nMax;n++) {
-    const rowData = data[n];
-    addRecDataToModel(rowData); // this function is in this file 
-  } // next n
+  try {
+    for (let n=0;n<nMax;n++) {
+      const rowData = data[n];
+      const recModelChanges = addRecDataToModel(rowData); // this function is in this file 
+      const nMax2 = recModelChanges.length;
+      for (let n2=0;n2<nMax2;n2++) {
+        const recChange = recModelChanges[n2];
+        modelChanges.push(recChange);
+
+        if (typeof modelChangesByRecType[recChange.recType] === "undefined") {
+          modelChangesByRecType[recChange.recType] = [];
+        } // end if
+
+        const recTypeChanges = modelChangesByRecType[recChange.recType];
+        recTypeChanges.push(recChange);
+      } // next n2
+
+    } // next n
+    
+    
+  } catch(err) {
+    let returnedData = {};
+    returnedData.result = "jsError";
+    returnedData.jsFunctionName = "addReturnedDataToModel()";
+    returnedData.errorOrigin = "client";
+    returnedData.message = err.message;
+    returnedData.fileName = err.fileName;
+    returnedData.lineNumber = err.line;
+    returnedData.spotInCode = "";
+    return false;
+  } // end of try/catch
   
 } // end of function addReturnedDataToModel()
 
@@ -122,7 +191,7 @@ function addReturnedDataToModel(data) {
  called when user clicks/taps "Save Changes" button
 *************************************************************************/
 function applyFormUiInputs(params) {
-  console.log("applyFormUiInputs() function called");
+  myConsole.log("<b>applyFormUiInputs()</b> function called");
   const sTableName = params.forTable;
   const tblSchema = app.schemaInfoByTableName[sTableName];
   const nMax = tblSchema.fields.length;
@@ -133,12 +202,18 @@ function applyFormUiInputs(params) {
   const frmMsgsNd = $("#frmMsgs")[0];
   let fld,n;
   
+  
   frmMsgsNd.innerHTML = "";
   
   for(n=0;n<nMax;n++) {
     fld = tblSchema.fields[n];
+    let bSysField = false;
     
-    if (fld.type === "text" || fld.type === "memo" || fld.type === "number" || fld.type === "email" || fld.type === "weekday" || fld.type === "datetime" || fld.type === "fk") {
+    if (typeof fld.sys === "boolean") {
+      bSysField = fld.sys;
+    } // end if
+    
+    if ((fld.type === "text" || fld.type === "memo" || fld.type === "number" || fld.type === "email" || fld.type === "weekday" || fld.type === "datetime" || fld.type === "fk") && !bSysField) {
     
       console.log("validating input field id: #frmItm"+fld.field);
       const inp = $("#frmItm"+fld.field)[0];
@@ -173,7 +248,8 @@ function applyFormUiInputs(params) {
 
           
           // note: a type of "fk" is an NeDb key value (which is a stringaddReturnedDataToModel)
-          if (fld.type === "text" || fld.type === "fk") {
+          // note: type "weekday" is a string value, so it should be included in the IF statement...
+          if (fld.type === "text" || fld.type === "fk" || fld.type === "email" || fld.type === "weekday") {
             updatedObj[fld.field] = inp.value;
           } // end if
           
@@ -264,7 +340,8 @@ function applyFormUiInputs(params) {
  if "saveRec" API call was successful, this function runs...
 *************************************************************************/
 function applyFormUiInputsSuccess(dataPosted, dataReturned) {
-  console.log("saveFormUiInputsSuccess() function called");
+  myConsole.log("<b>saveFormUiInputsSuccess()</b> function called");
+  
   const saveBtnNd = $("#saveBtn")[0];
   let sSpot = "";
   
@@ -324,7 +401,7 @@ function applyFormUiInputsSuccess(dataPosted, dataReturned) {
 
 *************************************************************************/
 function applyFormUiInputsFailure(dataPosted, dataReturned) {
-  console.log("saveFormUiInputsFailure() function called");
+  myConsole.log("<b>saveFormUiInputsFailure()</b> function called");
   const frmMsgsNd = $("#frmMsgs")[0];
   frmMsgsNd.style.color = "red";
   frmMsgsNd.innerHTML = "There was a problem when trying to save...";
@@ -347,6 +424,7 @@ function applyFormUiInputsFailure(dataPosted, dataReturned) {
   
 *************************************************************************/
 function buildFormUi(params) {
+  myConsole.log("<b>buildFormUi()</b> function called");
   let s=[];
   const sTableName = params.forTable;
   let sId = "";
@@ -367,6 +445,10 @@ function buildFormUi(params) {
     recData = dataById[sId];
   } else {
     recData = createNewRecObj(sTableName);
+    
+    if (recData === "error") {
+      return "error";
+    } // end if
   } // end if
   
   currEditObj = recData;
@@ -401,11 +483,16 @@ function buildFormUi(params) {
   for (n=0;n<nMax;n++) {
     fld = tblSchema.fields[n];
     let sCaption;
+    let bSysField = false;
+    
+    if (typeof fld.sys === "boolean") {
+      bSysField = fld.sys;
+    } // end if
     
     // is this a kind of field editable in the UI?
-    if (fld.type === "text" || fld.type === "number" || fld.type === "fk" ||
+    if ((fld.type === "text" || fld.type === "number" || fld.type === "fk" ||
         fld.type==="memo" || fld.type === "boolean" || fld.type === "datetime" || 
-        fld.type === "email" || fld.type === "date" || fld.type==="weekday") {
+        fld.type === "email" || fld.type === "date" || fld.type==="weekday") && !bSysField) {
       
       s.push("<tr>");
       s.push("<td nowrap ");
@@ -485,7 +572,7 @@ function buildFormUi(params) {
         s.push(">");
       } // end if -- for input tag related UI...
       
-      if (fld.type==="boolean") {
+      if (fld.type==="boolean" && !bSysField) {
         s.push("<input ");
         s.push("id='frmItm"+fld.field+"' ");
         s.push("type='checkbox' ");
@@ -499,20 +586,20 @@ function buildFormUi(params) {
         s.push(">");
       } // end if
       
-      if (fld.type==="memo") {
+      if (fld.type==="memo" && !bSysField) {
         s.push("<textarea rows='10' cols='60' ");
         s.push("id='frmItm"+fld.field+"' ");
         s.push(">");
         s.push("</textarea>");
       } // end if - memo
       
-      if (fld.type==="datetime") {
+      if (fld.type==="datetime" && !bSysField) {
         const sDate = recData[fld.field]+""; // hopefully cast it as a string
         s.push(dtCtrl.newCtrlMarkup({field:fld.field,pickDateCaption:"Pick Appointment Date",editTime:true,dateValue:sDate}));
       } // end if - datetime
       
       
-      if (fld.type==="weekday") {
+      if (fld.type==="weekday" && !bSysField) {
         s.push("<select ");
         s.push("id='frmItm"+fld.field+"' ");
         s.push(">");
@@ -529,7 +616,7 @@ function buildFormUi(params) {
       } // end if - weekday
       
       
-      if (fld.type==="fk") {
+      if (fld.type==="fk" && !bSysField) {
         s.push("<select ");
         s.push("id='frmItm"+fld.field+"' ");
         s.push(">");
@@ -539,17 +626,29 @@ function buildFormUi(params) {
         let sTableName = fld.fkTable;
         let tblData = appObj[sTableName+"ByIndex"];
         let nMax = tblData.length;
-        let sDisplayFieldName = fld.displayFields[0];  // for now...
+        let sDisplayFieldName = fld.field; 
+        
+        if (typeof fld.displayFields !== "undefined") {
+          sDisplayFieldName = fld.displayFields[0];  // for now...
+        } // end if
+        
+        let sFKField = fld.field;
+        
+        if (typeof fld.fkField === "string") {
+          sFKField = fld.fkField;
+        } // end if
         
         for (let n=0;n<nMax;n++) {
           let rec = tblData[n];
           s.push("<option value="+Q);
-          s.push(rec[fld.field]);
+          s.push(rec[sFKField]);  // was fld.field *
           s.push(Q+">");
           s.push(rec[sDisplayFieldName]);
           s.push("</option>");
         } // next n
         
+        // * fld.field is ok... IF the field name is EXACTLY the same of the key field name in the other table
+        //   otherwise it will NOT work!
         s.push("</select>");
       } // end if - "fk"
       
@@ -611,7 +710,14 @@ function buildFormUi(params) {
   for (n=0;n<nMax;n++) {
     fld = tblSchema.fields[n];
     
-    if (fld.type === "text"|| fld.type === "memo"  || fld.type === "number" || fld.type === "email" || fld.type === "weekday" || fld.type === "memo" || fld.type === "fk") {
+    let bSysField = false;
+    
+    if (typeof fld.sys === "boolean") {
+      bSysField = fld.sys;
+    } // end if
+    
+    
+    if ((fld.type === "text"|| fld.type === "memo"  || fld.type === "number" || fld.type === "email" || fld.type === "weekday" || fld.type === "memo" || fld.type === "fk") && !bSysField) {
       console.log("populating input field id: #frmItm"+fld.field);
       const inp = $("#frmItm"+fld.field)[0];
       inp.value = recData[fld.field];
@@ -652,7 +758,7 @@ function buildFormUi(params) {
    
 *************************************************************************/
 function buildBasicListUi(params) {
-  console.log("buildBasicListUi() function called");
+  myConsole.log("<b>buildBasicListUi()</b> function called");
   let s=[];
   const sTableName = params.forTable;
   const domEl = params.containerDomEl;
@@ -835,11 +941,12 @@ function buildBasicListUi(params) {
 
 
 
+
 /*************************************************************************
 
 *************************************************************************/
 function buildBasicListUiDataLoaded(dataPosted, dataReturned) {
-  console.log("buildBasicListUiDataLoaded() function called");
+  myConsole.log("<b>buildBasicListUiDataLoaded()</b> function called");
   const appObj = app;
   
   
@@ -958,7 +1065,7 @@ function buildBasicListUiDataLoaded(dataPosted, dataReturned) {
     console.log(err);
   } // end of try/catch block
   
-  console.log("buildBasicListUiDataLoaded() function finished");
+  myConsole.log("<b>buildBasicListUiDataLoaded()</b> function finished");
 } // end of function buildBasicListUiDataLoaded()
 
 
@@ -969,7 +1076,8 @@ function buildBasicListUiDataLoaded(dataPosted, dataReturned) {
 
 *************************************************************************/
 function buildBasicListUiDataLoadFailure(dataPosted, dataReturned) {
-  console.log("buildBasicListUiDataLoadFailure() function called");
+  myConsole.log("<b>buildBasicListUiDataLoadFailure()</b> function called");
+
   debugger;
 } // end of function buildBasicListUiDataLoadFailure()
 
@@ -1061,6 +1169,7 @@ function calSelDate(nMonth, nDay, nYear) {
 
 *************************************************************************/
 function clearFieldWarning(event) {
+  myConsole.log("<b>clearFieldWarning()</b> function called");
   const ctrl = event.target;
   ctrl.style.background = "white";
   const frmMsgsNd = $("#frmMsgs")[0];
@@ -1095,10 +1204,13 @@ function createNewRecObj(sTableName) {
  display a dialog showing JS Error info...
 *************************************************************************/
 function displayErrorInfo(returnedData) {
+  myConsole.log("<b>displayErrorInfo()</b> function called");
   const dia = document.createElement("div");  
   const splashNd = document.getElementById("splash");
   const s = [];
   
+  
+  const lg = myConsole.log("JS Error");
   // hide splash screen... in case it was blocking something
   // when the error occurred!
   splashNd.style.display = "none"; 
@@ -1123,7 +1235,10 @@ function displayErrorInfo(returnedData) {
   s.push("Spot in Code#: "+returnedData.spotInCode+"<br>");
 
   s.push("<center>");
-  s.push("<button id='jsErrInfoCloseBtn'>Close</button>");
+  s.push("<button id='jsErrInfoCloseBtn'>Close</button>&nbsp;");
+  
+  s.push("<button id='doARefreshBtn'>Refresh Page</button>&nbsp;");
+  s.push("<button id='vwLg1'>View Log</button>");
   s.push("</center>");
   
   dia.innerHTML = s.join("");
@@ -1131,7 +1246,11 @@ function displayErrorInfo(returnedData) {
   tintNd.style.display = "block";
   
   const jsErrInfoCloseBtnNd = document.getElementById("jsErrInfoCloseBtn");
+  const doARefreshBtnNd = document.getElementById("doARefreshBtn");
+  const vwLg1Nd = document.getElementById("vwLg1");
   jsErrInfoCloseBtnNd.addEventListener("click", displayErrorInfoClose);
+  doARefreshBtnNd.addEventListener("click", refreshPage); // refreshPage() is in:   app.js
+  vwLg1Nd.addEventListener("click", displayErrorInfoShowLog);
 } // end of function displayErrorInfo()
 
 
@@ -1139,6 +1258,7 @@ function displayErrorInfo(returnedData) {
  close dialog showing JS Error info...
 *************************************************************************/
 function displayErrorInfoClose() {
+  myConsole.log("<b>displayErrorInfoClose()</b> function called");
   const jsErrInfoNd = document.getElementById("jsErrInfo");
   jsErrInfoNd.style.display = "none";
   tintNd.style.display = "none";
@@ -1147,12 +1267,117 @@ function displayErrorInfoClose() {
 
 
 /*************************************************************************
+ close dialog showing JS Error info...
+*************************************************************************/
+function displayErrorInfoShowLog() {
+  myConsole.log("<b>displayErrorInfoShowLog()</b> function called");
+  displayErrorInfoClose();
+  lgDisplayLog(); // in app.js
+} // end of function displayErrorInfoClose()
+
+
+/*************************************************************************
+ populate and display reminder panel
+*************************************************************************/
+function displayReminderPanel() {
+  myConsole.log("<b>displayReminderPanel()</b> function called");
+  
+  
+  if (app.pin=== "") {
+    myConsole.log("device not registered - displayReminderPanel() function exited.");
+    return; // device not registered yet so no reminder panel!  
+  } // end if
+  
+  const reminderPanelNd = document.getElementById("reminderPanel");
+  const s=[];
+  const dt = new Date();
+	const nDayOfWeek = dt.getDay();
+  const weeklyReminders = app.weeklyRemindersByIndex;
+
+  prepReminders(weeklyReminders); // function is in app.js
+  //s.push("");
+  const nMax = weeklyReminders.length;
+  let bReminderFound = false;
+  
+  for (let n=0;n<nMax;n++) {
+    const reminder = weeklyReminders[n];
+    
+    if (reminder.dayOfWeekNum === nDayOfWeek) {
+      if (!bReminderFound) {
+        s.push("<h1>Hello Mom!</h1>");
+        
+        
+        s.push("<span style='font-size:38pt;'>");
+        s.push("🙂");
+        s.push("</span>");
+        
+        if (h>453) {
+          s.push("<br>&nbsp;");
+        } // end if
+        
+        s.push("<h3");
+        s.push(">");
+        
+        s.push("Just a Friendly Little Reminder...</h3>");
+        
+        if (h>453) {
+          s.push("<br>&nbsp;");
+        } // end if
+        
+        s.push("<h3><b>Today</b> is: &nbsp;&nbsp;");
+        s.push("<span class='dayOfTheWeek' ");
+        s.push(">");
+        s.push(reminder.dayOfWeek);
+        s.push("</span>");
+        s.push("</h3>");
+        s.push("<br>&nbsp;<br>");
+        s.push("<b>Today</b>, don't forget to...");
+        
+        s.push("<ul class='specialTaskLst'>");
+        bReminderFound = true;
+      } // end if
+      
+      s.push("<li>");  
+      s.push("<span class='specialTask'>");
+      s.push("do your ");
+      s.push(reminder.reminderText);   
+      s.push(" !");
+      s.push("</span>");
+      s.push("</li>");
+      
+    } // end if
+        
+  } // next n
+  
+  if (bReminderFound) {
+    s.push("</ul>");
+  } // end if
+  
+  s.push("<hr>");
+  s.push("Please press the <b>CLOSE</b> button below to<br>");
+  s.push("continue...<br>&nbsp;<br>");
+  s.push("&nbsp;<button id='closeBtn' ");
+  s.push(">Close</button>");
+  
+  reminderPanelNd.style.padding = "10px";
+  reminderPanelNd.innerHTML = s.join("");
+  const closeBtnNd = document.getElementById("closeBtn");
+  closeBtnNd.addEventListener("click", hideReminderPanel); 
+  showReminderPanel();
+} // end of function displayReminderPanel() 
+
+
+
+
+
+/*************************************************************************
 called when user clicks/taps the Back button on an edit list view
 *************************************************************************/
 function exitListEdit() {
-  console.log("exitListEdit() function called");
+  myConsole.log("<b>exitListEdit()</b> function called");
   currDomEl.style.display = "none";
   menuNd.style.display = "block";
+  app.currentView = "menu"; 
 } // end of function exitListEdit() 
 
 
@@ -1162,7 +1387,7 @@ function exitListEdit() {
 called when user clicks/taps the Back button on an edit form view
 *************************************************************************/
 function exitRecEdit(params1) {
-  console.log("exitRecEdit() function called");
+  myConsole.log("<b>exitRecEdit()</b> function called");
   
   if (bUnsavedChanges) {
     const frmMsgsNd = $("#frmMsgs")[0];
@@ -1183,9 +1408,10 @@ function exitRecEdit(params1) {
 
 
 /*************************************************************************
-
+  
 *************************************************************************/
 function filterDataForTable(idata,sTableName) {
+  myConsole.log("<b>filterDataForTable()</b> called. TableName: <b>"+sTableName+"</b>");
   const appObj = app;
   const schema = appObj.schemaInfoByTableName[sTableName];
   const sRecordType = schema.recordType
@@ -1211,60 +1437,125 @@ function filterDataForTable(idata,sTableName) {
 
 /*************************************************************************
 
+   should be grouped into functionality for: "application data"
+   applicationData.js ???
+   
+   Called by:
+      addRecDataToModel()
+      createNewRecObj()
+      
 *************************************************************************/
 function fixUpRecObj(recObj) {
   const appObj = app;
-  const tblSchema = appObj.schemaInfoByRecordType[recObj.recordType];
-  const nMax = tblSchema.fields.length;
-  let fld,n;
+  let sSpot = "n/a";
   
-  for(n=0;n<nMax;n++) {
-    fld = tblSchema.fields[n];
-    
-    console.log("    field: "+fld.field);
-    
-    if (typeof recObj[fld.field] === "undefined") {
-      if (typeof fld.defValue === "undefined") {    
-        if (typeof fld.type === "number") {
-          recObj[fld.field] = 0; 
-        } else if (fld.type === "comments") {
-          recObj[fld.field] = []; 
-        } else if (fld.type === "boolean") {
-          recObj[fld.field] = "N"; 
+  try {
+    const tblSchema = appObj.schemaInfoByRecordType[recObj.recordType];
+    const nMax = tblSchema.fields.length;
+    let fld,n;
+
+
+    // =======================================================
+    for(n=0;n<nMax;n++) {
+      fld = tblSchema.fields[n];
+
+     // console.log("    field: "+fld.field);
+
+      if (typeof recObj[fld.field] === "undefined") {
+        if (typeof fld.defValue === "undefined") {    
+          if (typeof fld.type === "number") {
+            recObj[fld.field] = 0; 
+          } else if (fld.type === "comments") {
+            recObj[fld.field] = []; 
+          } else if (fld.type === "boolean") {
+            recObj[fld.field] = "N"; 
+          } else {
+            recObj[fld.field] = ""; 
+          } // end if/else if/else
         } else {
-          recObj[fld.field] = ""; 
-        } // end if/else if/else
+          recObj[fld.field] = fld.defValue;
+        } // end if/else
       } else {
-        recObj[fld.field] = fld.defValue;
-      } // end if/else
-    } else {
-      // field HAS a value.... make sure that it is the right type!
-      if (fld.type === "string" || fld.type === "comments" || fld.type === "boolean") {
-        recObj[fld.field] = recObj[fld.field] + "";
+        // field HAS a value.... make sure that it is the right type!
+        if (fld.type === "string" || fld.type === "comments" || fld.type === "boolean") {
+          recObj[fld.field] = recObj[fld.field] + "";
+        } // end if
+
+        if (fld.type === "number") {
+          recObj[fld.field] = recObj[fld.field] - 0;
+        } // end if
+
+        // for debugging
+        if (fld.type === "date" || fld.type === "datetime" ) {
+          //debugger;
+        } // end if
+
+        if ((fld.type === "date" || fld.type === "datetime" ) && typeof recObj[fld.field] === "string") {
+          // convert a string version of a date into an actual {Date} object if needed
+          if (recObj[fld.field] !== "") {
+            recObj[fld.field] = new Date(recObj[fld.field]);
+          } // end if
+
+        } // end if
+
+        // Friday, Jan 3, 2020 OPC!
+        if ((fld.type === "date" || fld.type === "datetime" ) && typeof recObj[fld.field+"Ms"] === "undefined") {
+          // do we have the ms variation of the date/datetime?
+          // this is handy for neDb queries...
+          if (isDate(recObj[fld.field]) ) {
+            recObj[fld.field+"Ms"] = recObj[fld.field].getTime();
+          } else {
+            recObj[fld.field+"Ms"] = 0; // would zero Really be the value that this should be???
+          } // end if / else
+
+        } // end if
+
       } // end if
-      
-      if (fld.type === "number") {
-        recObj[fld.field] = recObj[fld.field] - 0;
+
+      if (typeof fld.sys !== "boolean") {
+        fld.sys = false; // by default not a system field (system fields do Not show up in GUI)!
       } // end if
-      
-      if ((fld.type === "date" || fld.type === "datetime" ) && typeof recObj[fld.field] === "string") {
-        recObj[fld.field] = new Date(recObj[fld.field]);
-      } // end if
-      
+    } // next n
+    // =======================================================
+
+    // handle implied fields that are not explicitely defined in the schema...
+    if (typeof recObj["createDate"] === "string") {
+      recObj["createDate"] = new Date(recObj["createDate"]);
     } // end if
+
+    if (typeof recObj["updateDate"] === "string") {
+      recObj["updateDate"] = new Date(recObj["updateDate"]);
+    } // end if
+
+    // millisecond versions :
+    recObj.createDateMs = 0; // ???
+    recObj.updateDateMs = 0; // ???
+  
+    if (isDate(recObj["createDate"]) ) {
+      recObj.createDateMs = recObj.createDate.getTime();
+    } // end if
+  
+    if (isDate(recObj["updateDate"]) ) {
+      recObj.updateDateMs = recObj.updateDate.getTime();
+    } // end if
+
+    return recObj;
+  } catch(err) {
+    let returnedData = {};
+    returnedData.result = "jsError";
+    returnedData.jsFunctionName = "fixUpRecObj()";
+    returnedData.errorOrigin = "client";
+    returnedData.message = err.message;
+    returnedData.fileName = err.fileName;
+    returnedData.lineNumber = err.line;
+    returnedData.spotInCode = sSpot;
     
-  } // next n
+    console.log(err);
+    
+    displayErrorInfo(returnedData);
+    return "error";
+  } // end of try / catch block
   
-  // handle implied fields that are not explicitely defined in the schema...
-  if (typeof recObj["createDate"] === "string") {
-    recObj["createDate"] = new Date(recObj["createDate"]);
-  } // end if
-  
-  if (typeof recObj["updateDate"] === "string") {
-    recObj["updateDate"] = new Date(recObj["updateDate"]);
-  } // end if
-  
-  return recObj;
 } // end of function fixUpRecObj()
 
 
@@ -1344,19 +1635,27 @@ function formattedDate(dt) {
 
 *************************************************************************/
 function getFkFieldValueAndType(siFkValue,fld) {
-  const appObj = app;
-  const sTableName = fld.fkTable;
-  const schema = appObj.schemaInfoByTableName[sTableName];
+  myConsole.log("<b>getFkFieldValueAndType()</b> called");
   const retValue = {};
-  const appRecsById = appObj[sTableName+"ByServerId"];
   
-  const rec = appRecsById[siFkValue];
-  const displayFields = fld.displayFields;
-  const sFFieldName = displayFields[0];  // only doing 1 field for now
-  const fld2 = schema.fieldsByFieldName[sFFieldName];
-  
-  retValue.value = rec[sFFieldName];
-  retValue.type = fld2.type;
+  try {
+    const appObj = app;
+    const sTableName = fld.fkTable;
+    const schema = appObj.schemaInfoByTableName[sTableName];
+
+    const appRecsById = appObj[sTableName+"ByServerId"];
+
+    const rec = appRecsById[siFkValue];
+    const displayFields = fld.displayFields;
+    const sFFieldName = displayFields[0];  // only doing 1 field for now
+    const fld2 = schema.fieldsByFieldName[sFFieldName];
+
+    retValue.value = rec[sFFieldName];
+    retValue.type = fld2.type;
+  } catch(err) {
+    retValue.value = "";
+    retValue.type = "";
+  } // end of try/catch blocks
   
   return retValue;
 } // end of function  getFkFieldValueAndType()
@@ -1418,6 +1717,7 @@ function getViewTitleBarBackButtonMarkup(params) {
  for views other than the main menu
 *************************************************************************/
 function getViewTitleBarMarkup(params) {
+  myConsole.log("<p>getViewTitleBarMarkup()</p> called");
   const s = [];
   
   s.push(getViewTitleBarBackButtonMarkup());
@@ -1441,12 +1741,68 @@ function hideCalendarCtl() {
 
 
 
+/*************************************************************************
+
+*************************************************************************/
+function hideReminderPanel(evt) {
+  myConsole.log("<b>hideReminderPanel()</b> called");
+  const customCssNd = document.getElementById("customCss");
+  const reminderPanelNd = document.getElementById("reminderPanel");
+  const s=[];
+  const nStartY = -(h + 20);
+    // s.push("")
+  
+  s.push(".rpHideStartPos {");
+  s.push(" transform: translate(0px, 0px);");
+  s.push("}");
+  
+  s.push("@keyframes slideUpToTopAni {");
+    s.push("0% {");
+    s.push(" transform: translate(0px, 0px);");
+    s.push("}");
+    s.push("100% {");    
+    s.push(" transform: translate(0px, "+nStartY+"px);");
+    s.push("}");
+  s.push("}");
+    
+  s.push(".doSlideUpToTop {");
+    s.push("animation-name: slideUpToTopAni;");
+    s.push("animation-duration: .5s;");
+    s.push("animation-fill-mode: both;");
+  s.push("}");
+  customCssNd.innerHTML = s.join("\n");
+  reminderPanelNd.className = "doSlideUpToTop";
+  app.displayingReminderPanel = false;
+  tintNd.style.display = "none";
+  setLastFocusEventTimestamp();
+} // end of function hideReminderPanel()
+
+
+
+/*************************************************************************
+*************************************************************************/
+function pauseTimeTimer() {
+  if (app.timeTimerId === -1) return;
+  
+  myConsole.log("pauseTimeTimer() called");
+  
+  try {
+    clearTimeout(app.timeTimerId);
+  } catch(err) {
+    console.log(err.message);
+  } // end of try/catch block
+  
+  app.timeTimerId = -1;
+} // end of function pauseTimeTimer()
+
+
 
 
 /*************************************************************************
  called when user clicks/taps "Save Changes" button
 *************************************************************************/
 function saveFormUiInputs(params) {
+  myConsole.log("<b>saveFormUiInputs()</b> called");
   params.thenRun = exitRecEdit;
   
   const params2 = {};
@@ -1458,6 +1814,211 @@ function saveFormUiInputs(params) {
 
 
 
+/*************************************************************************
+ uses CSS animation to slide the reminder panel into view!
+*************************************************************************/
+function showReminderPanel() {
+  myConsole.log("<b>showReminderPanel()</b> called");
+  
+  if (app.displayingReminderPanel) {
+    myConsole.log("already displaying reminder panel, so exiting function!");
+    return;
+  } // end if
+  
+  const customCssNd = document.getElementById("customCss");
+  const reminderPanelNd = document.getElementById("reminderPanel");
+  const s=[];
+  const nStartY = -(h + 20);
+    // s.push("")
+  
+  reminderPanelNd.style.display = "block";
+  
+  s.push(".rpShowStartPos {");
+  s.push(" transform: translate(0px, "+nStartY+"px);");
+  s.push("}");
+  
+  s.push("@keyframes slideDownFromTopAni {");
+    s.push("0% {");
+    s.push(" transform: translate(0px, "+nStartY+"px);");
+    s.push("}");
+    s.push("100% {");
+    s.push(" transform: translate(0px, 0px);")
+    s.push("}");
+  s.push("}");
+    
+  s.push(".doSlideDownFromTop {");
+    s.push("display: block;");
+    s.push("z-index: 1500;");
+    s.push("animation-name: slideDownFromTopAni;");
+    s.push("animation-duration: .5s;");
+    s.push("animation-fill-mode: both;");
+  s.push("}");
+  customCssNd.innerHTML = s.join("\n");
+  reminderPanelNd.className = "doSlideDownFromTop";
+  app.displayingReminderPanel = true;
+  tintNd.style.display = "block";
+  setLastFocusEventTimestamp();
+} // end of function showReminderPanel() 
 
 
 
+/*************************************************************************
+ runs when  CSS animation to slide the reminder panel into view is done
+*************************************************************************/
+function showReminderPanelCompleted() {
+  const s = [];
+  
+  //s.push("");
+  
+  s.push("Press the ");
+  s.push("button.");
+} // end of function showReminderPanelCompleted()
+
+
+
+/*************************************************************************
+  called in buildMenu() in app.js (if not called yet for this run)
+*************************************************************************/
+function setupTimeDisplay() {
+  const timeDspNd = document.createElement("div"); 
+  timeDspNd.id = "timeDsp";
+  timeDspNd.style.width = (w-15)+"px";
+  timeDspNd.style.top = (h-40-8)+"px";
+  document.body.appendChild(timeDspNd); 
+  updateTimeDisplay();
+} // end of function setupTimeDisplay()
+
+
+
+/*************************************************************************
+  called by setupTimeDisplay() and ... itself via setTimeout()
+  
+*************************************************************************/
+function updateTimeDisplay() {
+  app.timeTimerId = -1;
+  const timeDspNd = $("#timeDsp")[0];
+  const dt = new Date();
+  let sTime = getFullFormattedTime2(dt);  // function in app.js
+  timeDspNd.innerHTML = sTime;
+  
+  app.timeTimerId = setTimeout(updateTimeDisplay, 1000);
+  
+  let nSeconds = dt.getSeconds();
+  let bPollData = false;
+  
+  if (nSeconds === 0) {
+    bPollData = true;
+  } // end if
+  
+  if ((nSeconds === 20 || nSeconds === 40) && app.currentView === "appointments") {
+    // poll more often if user on appointments screen...
+    bPollData = true;
+  } // end if
+  
+  if (bPollData) {
+    pollData();
+  } // end if
+  
+} // end of function updateTimeDisplay()
+
+
+/************************************************************************* 
+  should be called every 20 seconds (give or take)
+  called via:  updateTimeDisplay()
+*************************************************************************/
+function pollData() {
+  myConsole.log("<b>pollData()</b> called");
+  app.pollCount  = app.pollCount + 1;
+  myConsole.log("pollCount="+app.pollCount);
+  if (app.gettingImportantData) {
+    myConsole.log("already getting important data");
+  } else {
+    getLatestImportantInfo(updateUi); // function in app.js
+  } // end if / else
+  
+} // end of function pollData()
+
+
+/*************************************************************************
+*************************************************************************/
+function updateUi() {
+  myConsole.log("<b>updateUi()</b> called");
+  
+  if (app.currentView === "menu") {
+    buildMenu();
+  } // end if
+  
+  if (app.currentView === "appointments") {
+    viewAppts2();
+  } // end if
+  
+  
+} // end of function updateUi()
+
+
+
+
+let currentUserPrompt;
+
+/*************************************************************************
+
+*************************************************************************/
+function userPrompt(params) {
+  let nPromptWidth = 600;
+  let sCaption = params.caption;
+  let buttons = params.buttons;
+  const s = [];
+  
+  const usrPromptNd = document.createElement("div");  
+  usrPromptNd.id = "usrPrompt";
+  
+  
+  s.push("<div class='usrPromptCaption' ")
+  s.push(">"+sCaption+"</div>")
+  
+  
+  
+} // end of function userPrompt()
+
+
+
+
+/*************************************************************************
+   Display a user notice that fades away in a few seconds.
+   
+   called by:
+     pickLocStatusSuccess()   in app.js
+*************************************************************************/
+function userNotice(sMsg) {
+  const userNoticeNd = $("#userNotice")[0];
+  const nWidth = w - 40;
+  const nHeight = 100;
+  const nLeft = Math.floor((w - nWidth) / 2);
+  const nTop = Math.floor((h - nHeight) / 2);
+  userNoticeNd.style.width = (nWidth)+"px";
+  userNoticeNd.style.top = (nTop)+"px";
+  userNoticeNd.style.left = (nLeft)+"px";
+  userNoticeNd.style.height = (nHeight)+"px";
+  userNoticeNd.style.display = "block";
+  userNoticeNd.innerHTML = sMsg;
+  userNoticeNd.addEventListener("animationend", userNoticeDone)
+  
+  userNoticeNd.className = "userNoticeFadeOut";
+} // end of function userNotice()
+
+
+
+/*************************************************************************
+*************************************************************************/
+function userNoticeDone(evt) {
+  const userNoticeNd = $("#userNotice")[0];
+  userNoticeNd.style.display = "none";
+  userNoticeNd.className = "";
+} // end of function userNoticeDone()
+
+
+/*************************************************************************
+*************************************************************************/
+function userPromptResponse(evt) {
+  
+} // end of function
