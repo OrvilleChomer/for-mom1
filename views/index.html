@@ -3,6 +3,7 @@
 
 
 <!--
+   OFFICIAL_MOM_APP_FILE
    The Coding Train... video with thoughts on setting up a web app on Glitch
    https://www.youtube.com/watch?v=Rz886HkV1j4
 
@@ -23,7 +24,7 @@
     
     <meta http-equiv="PRAGMA" content="NO-CACHE" />
     
-    <link rel="apple-touch-icon" href="https://cdn.glitch.com/a2964a8f-6339-465f-8a8d-329fd8d12c43%2Ftouch-icon-iphone-retina.png?v=1565021690526">
+    <link rel="apple-touch-icon" href="https://cdn.glitch.com/a2964a8f-6339-465f-8a8d-329fd8d12c43%2Ficon180x180c.png?v=1577039556540">
   
     <!-- import the webpage's stylesheet -->
     <link rel="stylesheet" href="/style.css">
@@ -33,13 +34,19 @@
             integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="   
             crossorigin="anonymous"></script>
     
-    
+    <link rel="manifest" href="/manifest.json">
   </head>
   <body>
     <div style="display:none;">
       <img src="https://cdn.glitch.com/a2964a8f-6339-465f-8a8d-329fd8d12c43%2Fspinner.gif?v=1565725966705" id="spinnerImage">
+      <img src="https://cdn.glitch.com/a2964a8f-6339-465f-8a8d-329fd8d12c43%2Fpixel.gif?v=1576787983725" id="pixelImg">
+      <div id="checkVal"></div>
     </div>
-    
+    <style id="customCss">
+    </style>
+<div id="cntr">
+  
+
     <div id="splash">
       <h2>For Mom</h2>
       &copy; <span id="copyrightYear1"></span> Original Copyright: Orville Paul Chomer
@@ -48,7 +55,7 @@
     </div><!-- splash -->
     
     
-    <div id="titleBar" onxclick="titleBarClick()">💕 For Mom 💕</div>
+    <div id="titleBar" onxclick="titleBarClick()">💕 &nbsp; <span class="textOutline">For Mom</span> &nbsp; 💕</div>
     
     <div id="menu">
       <div class="greeting">Hello <span id="userNameLabel">So-and-so</span>!</div>
@@ -62,6 +69,8 @@
     </div>
     
     <div id="pageContent"></div>
+    
+    <div id="reminderPanel"></div>
     
     <div id="tint"></div>
     
@@ -84,16 +93,16 @@
        <!-- https://www.smashingmagazine.com/2018/08/ux-html5-mobile-form-part-2/ -->
       
       Application PIN:
-      <input id="appPIN" type="password" autocomplete="off" autocapitalize="none" size="20">
+      <input id="appPIN" type="text" autocomplete="off" autocapitalize="none" size="20">
       <table cellpadding="0" cellspacing="0" border="0" width="200">
-        <tr valign="middle">
+       <!-- <tr valign="middle">
           <td width="20" nowrap><input type="checkbox" id="showPwd" onchange="toggleShowPwd(this)"></td>
           <td width="*" nowrap>&nbsp;show PIN</td>
-        </tr>
+        </tr> -->
       </table>
       <hr><br>
       <button onclick="registerThisDevice()">
-        Register this Device
+        📌 Register this Device
       </button>
       
       <div id="regResults"></div>        
@@ -108,16 +117,41 @@
       Reset App...
     </button>
     
+    <!-- 
+         The button below should only be visible when seeing the page in a regular web browser.
+         If running from an installed icon on your Home screen, this button will never appear.
+         If running in a browser other than Safari, on a OS other than iOS, this button will only
+         appear [after] the browser has determined the user has had enough engagement to warrant
+         them to be prompted.
+
+         When running where a standard PWA install is allowed, clicking the button will call the proper API to do so.
+         When running Safari on iOS, it will display instructions on how the user can add the app to their home screen.
+
+         The pageSetup() function in app.js is where it is determined if we will be unhiding the "installToHomeScreenInitPrompt"
+         DIV or not... (at least for iOS)
+         We check the window.navigator.standalone property, and if it is [false], we unhide the DIV (.style.display = 'block').
+    -->
     <div id="installToHomeScreenInitPrompt">
-      <button>
+      <!--  the installThis() function is in app.js -->
+      <button onclick="installThis()">
         Install this App to Home Screen
       </button>
     </div>
     
+    <div id="viewLogPanel"></div>
+    
     <button id="refreshPage" onclick="refreshPage()">Refresh Page</button>
+    <div id="otherEmergencyOptions">
+      <button onclick="lgDisplayLog()">View Log</button>
+    </div>
+    
+    <!-- popup and fade user notice -->
+    <div id="userNotice" style="display:none;"></div>
+    
+    </div><!-- cntr -->
+    
     <script src="https://orvillechomer.github.io/dateTimeCtrl_OldSchool/dateTimeCtrl_plain.js?v=3"></script>
     <script src="/ui.js" defer></script>
     <script src="/app.js" defer></script>
   </body>
 </html>
-
